@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+.tmp/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.zip
+*.spp
+*.spexp
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+AGENTS.override.md
