@@ -33,7 +33,8 @@ Texture Set 命名。自动与手动同步使用相同质量及所选 Painter �
 
 可以独立克隆本仓库，也可在合集仓库中初始化对应子模块。代码变更在本仓库的分支
 进行，Issues、PR 和发布也由本仓库管理；独立开发不依赖父仓库目录。
-修改前阅读 [AGENTS.md](AGENTS.md)。
+修改前阅读 [AGENTS.md](AGENTS.md)；需求如何拆成里程碑、如何评审、宿主验收和归档见
+[docs/workflow.md](docs/workflow.md)。
 
 使用 Python 3.10 或更高版本运行骨架检查：
 
