@@ -31,8 +31,9 @@ registration and pinned commit. Do not change sibling projects.
 - README.md and README_CN.md are aligned current manuals. Edit whole workflows
   in place; omit development diaries and superseded correction narratives.
 - Keep vocabulary in CONTEXT.md, durable decisions in docs/adr/, release changes
-  in CHANGELOG.md, and requirements/unresolved work in Issues. Do not retain
-  duplicate proposal baselines alongside their owners.
+  in CHANGELOG.md, and requirements/unresolved work in Issues. docs/history/
+  keeps the original requirement drafts read-only; do not maintain another
+  requirement baseline beside the Issues.
 - Use codex/<topic> branches for substantial changes and open a PR. The issue
   defines scope and observable acceptance; the PR records exact base/head SHAs,
   validation and limitations. Merge/closure follows the authorized scope and
