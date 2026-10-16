@@ -8,7 +8,8 @@ registration and pinned commit. Do not change sibling projects.
 ## Contracts and layout
 
 - Read CONTEXT.md for terminology and docs/adr/ for architecture decisions.
-  Requirements and acceptance live in this repository's Issues #1, #2 and #3.
+  Undelivered requirements live in Issue #1; milestone scope and acceptance in
+  its milestone Issues (M0 #2, M1 #3). docs/workflow.md defines the lifecycle.
 - The project is a 0.0.0 scaffold. Do not describe planned functionality as
   implemented or claim host verification from ordinary Python checks.
 - Painter runtime lives in plugins/stou_texture_sync/. Use lowercase snake_case
@@ -31,16 +32,22 @@ registration and pinned commit. Do not change sibling projects.
 - README.md and README_CN.md are aligned current manuals. Edit whole workflows
   in place; omit development diaries and superseded correction narratives.
 - Keep vocabulary in CONTEXT.md, durable decisions in docs/adr/, release changes
-  in CHANGELOG.md, and requirements/unresolved work in Issues. docs/history/
-  keeps the original requirement drafts read-only; do not maintain another
-  requirement baseline beside the Issues.
-- Use codex/<topic> branches for substantial changes and open a PR. The issue
-  defines scope and observable acceptance; the PR records exact base/head SHAs,
-  validation and limitations. Merge/closure follows the authorized scope and
-  acceptance. Preserve unrelated work and never rewrite shared history.
+  in CHANGELOG.md, and requirements/unresolved work in Issues. When a milestone
+  closes, move its delivered requirements to their maintained owners and trim
+  Issue #1 as docs/workflow.md describes; do not keep another requirement
+  baseline beside the Issues. docs/history/ keeps the original drafts read-only
+  and the selected completed decisions and evidence under its own rules.
+- Follow docs/workflow.md for Issue/PR work: codex/<topic> branches with a PR to
+  main, `Refs #<issue>` (never closing keywords), full base/head SHAs, AC and
+  R- finding IDs, review of the exact SHA, `--match-head-commit` merges, host
+  acceptance reports and explicit closure. Agent reports on issues use its
+  report format. Merge, closure and comment deletion follow the user's
+  authorization. Preserve unrelated work and never rewrite shared history.
 - Use gh from this clone. Re-read an issue before editing, preserve user
   decisions and existing comments, and use UTF-8 body files for multiline text.
   Never publish machine-specific paths, credentials or private asset contents.
+  Report the state reached precisely: implemented, reviewed, merged,
+  host-verified or released.
 - Keep scratch under the actual Git root's parent .tmp/; fall back to ignored
   .tmp/ inside this repository. Remove task-owned scratch when no longer needed.
 - Do not check in caches, host build output, archives, .spp projects or proprietary
