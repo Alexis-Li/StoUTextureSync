@@ -87,11 +87,11 @@ one-off harnesses stay in scratch.
   affected checks before merge.
 - **Merge.** Merge only after the review of the head SHA is published; the
   user's merge authorization does not replace it. Merge with
-  `gh pr merge --match-head-commit <reviewed-head>` and note the resulting
-  `main` SHA on the PR. Merge follows the user's authorization.
-- **Update the issue.** Comment on the issue: PR and commits, AC covered,
-  state reached (implemented, reviewed, merged, host-verified) and what
-  remains.
+  `gh pr merge --match-head-commit <reviewed-head>`. Merge follows the user's
+  authorization.
+- **Update the issue.** Comment on the issue: PR and commits, the resulting
+  `main` SHA, AC covered, state reached (implemented, reviewed, merged,
+  host-verified) and what remains.
 
 Ordinary checks (`tools/validate_project.py`, compileall, unit tests, CI) are
 local evidence only. They never establish host compatibility.
@@ -119,8 +119,10 @@ memory peaks, visual owner acceptance) go into a history record at closure.
 
 ## 4. Closure
 
-Close a milestone issue explicitly, with a comment that links the final review,
-the integration SHA on `main` and the host acceptance results, when:
+Close a milestone issue explicitly when the conditions below hold. Closing is
+also a tidy: the status comment (see Archival) is rewritten to its final state,
+`已关闭` with the final review, the integration SHA on `main` and the host
+acceptance results, and the other comments are deleted. Close when:
 
 - every AC is met, or dropped or moved with the user's recorded decision;
 - no blocking `R-xxx` finding is open;
@@ -163,18 +165,21 @@ host measurements, owner visual acceptance, hard-to-reproduce failures. Extend
 an existing topic record before creating one.
 
 Issue comments are working material, not a permanent record: progress, review
-and acceptance comments are added as work goes on. When the user asks to tidy
-an issue's comments, merge what still matters into one status comment (format
-below) or its maintained owner (ADR, #1, README, `docs/history/`) and delete
-the rest; outdated content is simply dropped. Git does not keep remote
-comments, so anything a future decision or regression check needs must reach a
-repository owner first.
-Remove task-owned scratch after the evidence it held is preserved.
+and acceptance comments are added as work goes on. A new comment carries new
+facts only; a mistake or outdated statement in one's own comment is corrected
+by editing that comment, never by a follow-up correction. When the user asks to
+tidy an issue's comments, and when an issue closes, merge what still matters
+into one status comment (format below) or its maintained owner (ADR, #1,
+README, `docs/history/`) and delete the rest; outdated content is simply
+dropped. Git does not keep remote comments, so anything a future decision or
+regression check needs must reach a repository owner first. Remove task-owned
+scratch after the evidence it held is preserved.
 
 ## Issue status comment
 
-Tidying an issue's comments on the user's request produces one status comment
-in this format; new comments then accumulate again until the next tidy. Like
+Tidying an issue's comments on the user's request, or closing it, produces one
+status comment in this format; on an open issue new comments then accumulate
+again until the next tidy. Like
 every comment, it states the current fact: no change logs, "updated per
 request" notes or labels for what was removed.
 
