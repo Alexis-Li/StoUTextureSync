@@ -1,0 +1,985 @@
+{
+ "purpose": "M0 host measurements summarized from probe logs (issue #2); no paths or asset contents.",
+ "hosts": {
+  "painter": "11.0.0 (Python 3.11.6)",
+  "unreal_editor": "5.7.4-51494982+++UE5+Release-5.7 (official)",
+  "topia_engine": "not tested"
+ },
+ "machine": {
+  "os": "Windows 11 Pro 10.0.26300",
+  "ram_gb": 32,
+  "gpu": "NVIDIA GeForce RTX 4060",
+  "note": "user active on the machine during UE runs; Painter and UE open together"
+ },
+ "identity": [
+  {
+   "step": "created_unsaved"
+  },
+  {
+   "step": "metadata_set",
+   "needs_saving": true,
+   "metadata_kept": true
+  },
+  {
+   "step": "saved_A"
+  },
+  {
+   "step": "save_as_copy_done"
+  },
+  {
+   "step": "reopen_A",
+   "same_uuid_as_A": true,
+   "metadata_kept": true
+  },
+  {
+   "step": "save_as_B",
+   "same_uuid_as_A": true,
+   "metadata_kept": true
+  },
+  {
+   "step": "open_save_as_copy",
+   "same_uuid_as_A": true,
+   "metadata_kept": true
+  },
+  {
+   "step": "open_os_copy",
+   "same_uuid_as_A": true,
+   "metadata_kept": true
+  },
+  {
+   "step": "open_moved_chinese_path",
+   "same_uuid_as_A": true,
+   "metadata_kept": true
+  },
+  {
+   "step": "new_project_unsaved",
+   "same_uuid_as_A": false
+  }
+ ],
+ "texture_events": {
+  "throttle_default_2000ms": [
+   {
+    "edit": "insert_fill_all_tiles",
+    "events": 8,
+    "actions": [
+     "ADD"
+    ],
+    "tiles": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      0
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "first_ms": 1.3,
+    "last_ms": 36.7
+   },
+   {
+    "edit": "fill_color_change",
+    "events": 8,
+    "actions": [
+     "UPDATE"
+    ],
+    "tiles": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      0
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "first_ms": 1997.8,
+    "last_ms": 2028.1
+   },
+   {
+    "edit": "restrict_fill_to_tile_1_0",
+    "events": 6,
+    "actions": [
+     "REMOVE"
+    ],
+    "tiles": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "first_ms": 0.2,
+    "last_ms": 3.0
+   },
+   {
+    "edit": "fill_color_change_tile_1_0",
+    "events": 2,
+    "actions": [
+     "UPDATE"
+    ],
+    "tiles": [
+     [
+      1,
+      0
+     ]
+    ],
+    "first_ms": 1995.8,
+    "last_ms": 1996.0
+   },
+   {
+    "edit": "opacity_change",
+    "events": 1,
+    "actions": [
+     "UPDATE"
+    ],
+    "tiles": [
+     [
+      1,
+      0
+     ]
+    ],
+    "first_ms": 2045.1,
+    "last_ms": 2045.1
+   },
+   {
+    "edit": "add_black_mask",
+    "events": 2,
+    "actions": [
+     "REMOVE"
+    ],
+    "tiles": [
+     [
+      1,
+      0
+     ]
+    ],
+    "first_ms": 0.4,
+    "last_ms": 2.1
+   },
+   {
+    "edit": "hide_layer",
+    "events": 0,
+    "actions": [],
+    "tiles": [],
+    "first_ms": null,
+    "last_ms": null
+   },
+   {
+    "edit": "insert_paint_layer_empty",
+    "events": 0,
+    "actions": [],
+    "tiles": [],
+    "first_ms": null,
+    "last_ms": null
+   },
+   {
+    "edit": "show_layer_roughness_only",
+    "events": 0,
+    "actions": [],
+    "tiles": [],
+    "first_ms": null,
+    "last_ms": null
+   }
+  ],
+  "throttle_500ms": [
+   {
+    "edit": "insert_fill_all_tiles",
+    "events": 8,
+    "actions": [
+     "ADD"
+    ],
+    "tiles": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      0
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "first_ms": 1.5,
+    "last_ms": 29.2
+   },
+   {
+    "edit": "fill_color_change",
+    "events": 8,
+    "actions": [
+     "UPDATE"
+    ],
+    "tiles": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      0
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "first_ms": 503.9,
+    "last_ms": 511.9
+   },
+   {
+    "edit": "restrict_fill_to_tile_1_0",
+    "events": 6,
+    "actions": [
+     "REMOVE"
+    ],
+    "tiles": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "first_ms": 0.3,
+    "last_ms": 4.4
+   },
+   {
+    "edit": "fill_color_change_tile_1_0",
+    "events": 2,
+    "actions": [
+     "UPDATE"
+    ],
+    "tiles": [
+     [
+      1,
+      0
+     ]
+    ],
+    "first_ms": 498.7,
+    "last_ms": 499.0
+   },
+   {
+    "edit": "opacity_change",
+    "events": 1,
+    "actions": [
+     "UPDATE"
+    ],
+    "tiles": [
+     [
+      1,
+      0
+     ]
+    ],
+    "first_ms": 495.9,
+    "last_ms": 495.9
+   },
+   {
+    "edit": "add_black_mask",
+    "events": 2,
+    "actions": [
+     "REMOVE"
+    ],
+    "tiles": [
+     [
+      1,
+      0
+     ]
+    ],
+    "first_ms": 0.2,
+    "last_ms": 1.0
+   },
+   {
+    "edit": "hide_layer",
+    "events": 0,
+    "actions": [],
+    "tiles": [],
+    "first_ms": null,
+    "last_ms": null
+   },
+   {
+    "edit": "insert_paint_layer_empty",
+    "events": 0,
+    "actions": [],
+    "tiles": [],
+    "first_ms": null,
+    "last_ms": null
+   },
+   {
+    "edit": "show_layer_roughness_only",
+    "events": 0,
+    "actions": [],
+    "tiles": [],
+    "first_ms": null,
+    "last_ms": null
+   }
+  ]
+ },
+ "export_light": [
+  {
+   "label": "body_full_1k_a",
+   "status": "Success",
+   "export_ms": 468.7,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_1k_b",
+   "status": "Success",
+   "export_ms": 473.7,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_2k",
+   "status": "Success",
+   "export_ms": 1947.7,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     2048,
+     2048
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_one_tile_1k",
+   "status": "Success",
+   "export_ms": 378.7,
+   "files": 3,
+   "planned": 4,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_two_tiles_1k",
+   "status": "Success",
+   "export_ms": 416.7,
+   "files": 3,
+   "planned": 4,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_chinese_stage",
+   "status": "Success",
+   "export_ms": 607.3,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_1k_rep0",
+   "status": "Success",
+   "export_ms": 507.7,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_1k_rep1",
+   "status": "Success",
+   "export_ms": 646.6,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_1k_rep2",
+   "status": "Success",
+   "export_ms": 524.5,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_1k_rep3",
+   "status": "Success",
+   "export_ms": 523.8,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "body_full_1k_rep4",
+   "status": "Success",
+   "export_ms": 645.9,
+   "files": 12,
+   "planned": 16,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "clothing_all_1k",
+   "status": "Success",
+   "export_ms": 432.3,
+   "files": 6,
+   "planned": 8,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "clothing_one_set_1k",
+   "status": "Success",
+   "export_ms": 453.9,
+   "files": 3,
+   "planned": 4,
+   "sizes": [
+    [
+     1024,
+     1024
+    ]
+   ],
+   "distinct_sha": 3
+  },
+  {
+   "label": "clothing_all_2k",
+   "status": "Success",
+   "export_ms": 1638.6,
+   "files": 6,
+   "planned": 8,
+   "sizes": [
+    [
+     2048,
+     2048
+    ]
+   ],
+   "distinct_sha": 3
+  }
+ ],
+ "export_light_body_full_1k_reps": {
+  "n": 5,
+  "median_ms": 524.5,
+  "max_ms": 646.6
+ },
+ "repeat_export_identical_bytes": true,
+ "uv_tiles_filter": [
+  {
+   "variant": [
+    [
+     1,
+     0
+    ]
+   ],
+   "planned": [
+    "T_DefaultMaterial_ARM_1002.png",
+    "T_DefaultMaterial_Albedo_1002.png",
+    "T_DefaultMaterial_Emissive_1002.png",
+    "T_DefaultMaterial_Normal_1002.png"
+   ],
+   "error": false
+  },
+  {
+   "variant": [
+    [
+     0,
+     0
+    ]
+   ],
+   "planned": [
+    "T_DefaultMaterial_ARM_1001.png",
+    "T_DefaultMaterial_Albedo_1001.png",
+    "T_DefaultMaterial_Emissive_1001.png",
+    "T_DefaultMaterial_Normal_1001.png"
+   ],
+   "error": false
+  },
+  {
+   "variant": [
+    [
+     1,
+     1
+    ]
+   ],
+   "planned": [
+    "T_DefaultMaterial_ARM_1012.png",
+    "T_DefaultMaterial_Albedo_1012.png",
+    "T_DefaultMaterial_Emissive_1012.png",
+    "T_DefaultMaterial_Normal_1012.png"
+   ],
+   "error": false
+  },
+  {
+   "variant": [
+    [
+     2,
+     1
+    ]
+   ],
+   "planned": [],
+   "error": false
+  },
+  {
+   "variant": [
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ]
+   ],
+   "planned": [
+    "T_DefaultMaterial_ARM_1002.png",
+    "T_DefaultMaterial_Albedo_1002.png",
+    "T_DefaultMaterial_Emissive_1002.png",
+    "T_DefaultMaterial_Normal_1002.png"
+   ],
+   "error": false
+  },
+  {
+   "variant": [
+    "1002"
+   ],
+   "planned": null,
+   "error": true
+  },
+  {
+   "variant": [
+    1002
+   ],
+   "planned": null,
+   "error": true
+  }
+ ],
+ "stall_light": [],
+ "export_heavy": {
+  "stack": {
+   "smart_materials": [
+    "Aluminium Anodized Red",
+    "Aluminium Brushed Worn",
+    "Bone Stylized",
+    "Bronze Armor",
+    "Bronze Corroded",
+    "Bronze Statue",
+    "Charcoal",
+    "Chrome Blue Tint"
+   ],
+   "layer_nodes": 38
+  },
+  "timings": [
+   {
+    "label": "heavy_full_1k",
+    "n": 7,
+    "median_ms": 530.3,
+    "p95_ms": 638.0,
+    "max_ms": 638.0,
+    "stall_median_ms": 32.6,
+    "stall_max_ms": 37.4
+   },
+   {
+    "label": "heavy_one_tile_1k",
+    "n": 7,
+    "median_ms": 434.6,
+    "p95_ms": 474.6,
+    "max_ms": 474.6,
+    "stall_median_ms": 34.1,
+    "stall_max_ms": 38.6
+   },
+   {
+    "label": "heavy_full_2k",
+    "n": 7,
+    "median_ms": 2532.1,
+    "p95_ms": 4071.4,
+    "max_ms": 4071.4,
+    "stall_median_ms": 61.5,
+    "stall_max_ms": 349.0
+   },
+   {
+    "label": "heavy_one_tile_2k",
+    "n": 7,
+    "median_ms": 1763.6,
+    "p95_ms": 1790.0,
+    "max_ms": 1790.0,
+    "stall_median_ms": 61.7,
+    "stall_max_ms": 80.2
+   }
+  ]
+ },
+ "ue_auto_reimport": [
+  {
+   "series": "part3_bg_thr1_throttle",
+   "n": 5,
+   "files": 3,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 1.016,
+   "last_median_s": 1.603,
+   "last_max_s": 1.726,
+   "md5_matches_published": true,
+   "ue_became_foreground": 1
+  },
+  {
+   "series": "part3_min_thr1_throttle",
+   "n": 5,
+   "files": 3,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 1.013,
+   "last_median_s": 1.588,
+   "last_max_s": 1.678,
+   "md5_matches_published": true,
+   "ue_became_foreground": 0
+  },
+  {
+   "series": "direct_slow_bg_throttle",
+   "n": 2,
+   "files": 1,
+   "size": 1024,
+   "mode": "direct_slow",
+   "complete": 2,
+   "first_median_s": 1.0385,
+   "last_median_s": 1.0385,
+   "last_max_s": 1.04,
+   "md5_matches_published": true,
+   "ue_became_foreground": 0
+  },
+  {
+   "series": "part3_bg_thr1_nothrottle",
+   "n": 5,
+   "files": 3,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 1.012,
+   "last_median_s": 1.624,
+   "last_max_s": 1.707,
+   "md5_matches_published": true,
+   "ue_became_foreground": 1
+  },
+  {
+   "series": "part3_min_thr1_nothrottle",
+   "n": 5,
+   "files": 3,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 1.019,
+   "last_median_s": 1.586,
+   "last_max_s": 1.694,
+   "md5_matches_published": true,
+   "ue_became_foreground": 0
+  },
+  {
+   "series": "all12_bg_thr1_nothrottle",
+   "n": 5,
+   "files": 12,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 0.944,
+   "last_median_s": 2.829,
+   "last_max_s": 2.96,
+   "md5_matches_published": true,
+   "ue_became_foreground": 0
+  },
+  {
+   "series": "all12_2k_bg_thr1_nothrottle",
+   "n": 3,
+   "files": 12,
+   "size": 2048,
+   "mode": "atomic",
+   "complete": 3,
+   "first_median_s": 0.983,
+   "last_median_s": 3.129,
+   "last_max_s": 3.184,
+   "md5_matches_published": true,
+   "ue_became_foreground": 0
+  },
+  {
+   "series": "part3_bg_thr03_nothrottle",
+   "n": 5,
+   "files": 3,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 0.322,
+   "last_median_s": 0.972,
+   "last_max_s": 1.049,
+   "md5_matches_published": true,
+   "ue_became_foreground": 2
+  },
+  {
+   "series": "single_bg_thr03_nothrottle",
+   "n": 5,
+   "files": 1,
+   "size": 1024,
+   "mode": "atomic",
+   "complete": 5,
+   "first_median_s": 0.331,
+   "last_median_s": 0.331,
+   "last_max_s": 0.334,
+   "md5_matches_published": true,
+   "ue_became_foreground": 0
+  }
+ ],
+ "ue_offline": {
+  "detect_on_startup=True": {
+   "dirty_before_quit": [],
+   "quit_s": 2.8,
+   "startup_reimports": [],
+   "recorded_after_restart": {
+    "T_C00_Leg_ARM.png": "offline",
+    "T_C00_Leg_Albedo.png": "offline"
+   },
+   "identical_republish_reimported": [],
+   "after_full_sync_matches_disk": true
+  },
+  "detect_on_startup=False": {
+   "dirty_before_quit": [],
+   "quit_s": 2.8,
+   "startup_reimports": [],
+   "recorded_after_restart": {
+    "T_C00_Leg_ARM.png": "online_unsaved",
+    "T_C00_Leg_Albedo.png": "online_unsaved"
+   },
+   "identical_republish_reimported": [
+    "T_C00_Leg_ARM",
+    "T_C00_Leg_Albedo"
+   ],
+   "after_full_sync_matches_disk": true
+  }
+ },
+ "end_to_end_threshold_1s": [
+  {
+   "i": 0,
+   "scope": "tile_1001",
+   "event_s": 0.5,
+   "sp_s": 2.014,
+   "export_s": 0.453,
+   "stall_ms": 28.9,
+   "published": 1,
+   "dedup_skipped": 2,
+   "e2e_s": 3.048,
+   "ue_s": 1.034
+  },
+  {
+   "i": 1,
+   "scope": "whole_set",
+   "event_s": 0.512,
+   "sp_s": 2.247,
+   "export_s": 0.684,
+   "stall_ms": 34.3,
+   "published": 3,
+   "dedup_skipped": 9,
+   "e2e_s": 3.92,
+   "ue_s": 1.673
+  },
+  {
+   "i": 2,
+   "scope": "tile_1001",
+   "event_s": 0.488,
+   "sp_s": 1.994,
+   "export_s": 0.478,
+   "stall_ms": 39.8,
+   "published": 1,
+   "dedup_skipped": 2,
+   "e2e_s": 3.025,
+   "ue_s": 1.032
+  },
+  {
+   "i": 3,
+   "scope": "whole_set",
+   "event_s": 0.506,
+   "sp_s": 2.275,
+   "export_s": 0.69,
+   "stall_ms": 33.1,
+   "published": 3,
+   "dedup_skipped": 9,
+   "e2e_s": 3.94,
+   "ue_s": 1.664
+  },
+  {
+   "i": 4,
+   "scope": "tile_1001",
+   "event_s": 0.498,
+   "sp_s": 2.013,
+   "export_s": 0.475,
+   "stall_ms": 33.6,
+   "published": 1,
+   "dedup_skipped": 2,
+   "e2e_s": 3.055,
+   "ue_s": 1.043
+  },
+  {
+   "i": 5,
+   "scope": "whole_set",
+   "event_s": 0.506,
+   "sp_s": 2.31,
+   "export_s": 0.698,
+   "stall_ms": 33.1,
+   "published": 3,
+   "dedup_skipped": 9,
+   "e2e_s": 3.976,
+   "ue_s": 1.666
+  },
+  {
+   "i": 6,
+   "scope": "tile_1001",
+   "event_s": 0.488,
+   "sp_s": 1.968,
+   "export_s": 0.47,
+   "stall_ms": 33.8,
+   "published": 1,
+   "dedup_skipped": 2,
+   "e2e_s": 3.006,
+   "ue_s": 1.038
+  },
+  {
+   "i": 7,
+   "scope": "whole_set",
+   "event_s": 0.499,
+   "sp_s": 2.248,
+   "export_s": 0.682,
+   "stall_ms": 33.7,
+   "published": 3,
+   "dedup_skipped": 9,
+   "e2e_s": 3.967,
+   "ue_s": 1.719
+  },
+  {
+   "i": 8,
+   "scope": "tile_1001",
+   "event_s": 0.496,
+   "sp_s": 1.979,
+   "export_s": 0.456,
+   "stall_ms": 30.6,
+   "published": 1,
+   "dedup_skipped": 2,
+   "e2e_s": 3.016,
+   "ue_s": 1.037
+  },
+  {
+   "i": 9,
+   "scope": "whole_set",
+   "event_s": 0.492,
+   "sp_s": 2.236,
+   "export_s": 0.709,
+   "stall_ms": 37.2,
+   "published": 3,
+   "dedup_skipped": 9,
+   "e2e_s": 3.846,
+   "ue_s": 1.61
+  },
+  {
+   "i": 10,
+   "scope": "tile_1001_then_disabled",
+   "event_s": 0.488,
+   "sp_s": 8.754,
+   "export_s": 0.46,
+   "stall_ms": 34.3,
+   "published": 1,
+   "dedup_skipped": 2,
+   "e2e_s": 9.794,
+   "ue_s": 1.04
+  }
+ ]
+}

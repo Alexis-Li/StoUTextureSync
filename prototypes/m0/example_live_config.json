@@ -1,0 +1,18 @@
+{
+  "preset": "<export preset display name>",
+  "target_dir": "<monitored source-image directory>",
+  "stage_dir": "<scratch>/live_stage",
+  "log": "<scratch>/live_loop.jsonl",
+  "debounce_s": 1.0,
+  "throttle_ms": 500,
+  "size_log2": 10,
+  "texture_set_size_log2": {},
+  "enabled": true,
+  "texture_sets": {
+    "DefaultMaterial": {
+      "mode": "body_part",
+      "character_prefix": "C00",
+      "tile_parts": {"1001": "Face", "1002": "Body", "1011": "Arm", "1012": "Leg"}
+    }
+  }
+}

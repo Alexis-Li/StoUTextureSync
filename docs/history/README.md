@@ -18,7 +18,9 @@ edited; current requirements are owned as described in the
 
 ## Topic records
 
-None yet.
+- [m0-host-validation.md](m0-host-validation.md): M0 (issue #2) host
+  evidence for Painter 11.0 and Unreal Editor 5.7.4, with its measurements in
+  [m0-host-validation-data.json](m0-host-validation-data.json).
 
 ## What belongs here
 

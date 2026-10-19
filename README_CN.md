@@ -11,7 +11,8 @@ Unreal Engine 中已有的 Texture 资产。
 当前没有可安装的发布版本。
 
 目标环境为 Windows、Painter 11.0、Unreal Editor 5.7.4 与 Topia Engine 5.7.4。
-这些宿主中的兼容性和性能均待验证。
+M0 原型已在 Painter 11.0 与官方 Unreal Editor 5.7.4 中取得部分证据
+（[记录](docs/history/m0-host-validation.md)）；插件本身、Topia Engine 及正式场景仍待验证。
 
 ## 预定使用流程
 
@@ -41,7 +42,10 @@ Texture Set 命名。自动与手动同步使用相同质量及所选 Painter �
 ```powershell
 python tools/validate_project.py
 python -m compileall -q plugins
+python -m unittest discover -s prototypes/m0/tests
 ```
+
+[prototypes/m0](prototypes/m0/README.md) 保存 M0 宿主探针，不随插件安装。
 
 上述检查不代表宿主兼容性已验证。实现和宿主测试由
 [M0 技术验证](https://github.com/Alexis-Li/StoUTextureSync/issues/2)与
