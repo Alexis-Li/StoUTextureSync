@@ -37,12 +37,13 @@ registration and pinned commit. Do not change sibling projects.
   Issue #1 as docs/workflow.md describes; do not keep another requirement
   baseline beside the Issues. docs/history/ keeps the original drafts read-only
   and the selected completed decisions and evidence under its own rules.
-- Follow docs/workflow.md for Issue/PR work: codex/<topic> branches with a PR to
-  main, `Refs #<issue>` (never closing keywords), full base/head SHAs, AC and
-  R- finding IDs, review of the exact SHA, `--match-head-commit` merges, host
-  acceptance reports and explicit closure. Agent reports on issues use its
-  report format. Merge, closure and comment deletion follow the user's
-  authorization. Preserve unrelated work and never rewrite shared history.
+- Follow docs/workflow.md for Issue/PR work: feature/<topic> or fix/<topic>
+  branches with a PR to main, `Refs #<issue>` (never closing keywords), full
+  base/head SHAs, AC and R- finding IDs, a published review of the exact head
+  SHA before every merge, `--match-head-commit` merges, host acceptance reports
+  and explicit closure. Agent reports on issues use its report format. Merge,
+  closure and comment deletion follow the user's authorization. Preserve
+  unrelated work and never rewrite shared history.
 - Use gh from this clone. Re-read an issue before editing, preserve user
   decisions and existing comments, and use UTF-8 body files for multiline text.
   Never publish machine-specific paths, credentials or private asset contents.
