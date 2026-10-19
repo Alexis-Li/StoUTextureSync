@@ -9,7 +9,7 @@ labels: bug
 
 - StoUTextureSync 版本或提交：
 - Painter 版本：
-- UE 版本（Unreal Editor / Topia Engine）：
+- Unreal Editor 版本：
 - 操作系统：
 
 ## 复现步骤

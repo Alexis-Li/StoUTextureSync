@@ -83,8 +83,8 @@ local evidence only. They never establish host compatibility.
 ## 3. Host acceptance
 
 Events, export, UI, file publication timing, UE reimport and lifecycle need
-evidence in the declared hosts: Painter 11.0 and, per engine, Unreal Editor
-5.7.4 and Topia Engine 5.7.4. Record evidence as a host acceptance report on the
+evidence in the declared hosts: Painter 11.0 and the official Unreal Editor
+5.7.4. Record evidence as a host acceptance report on the
 milestone (or child) issue, using the report format below with kind
 `acceptance`. Each report states:
 

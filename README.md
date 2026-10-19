@@ -11,8 +11,10 @@ The project is in prototyping. Version `0.0.0` contains empty Painter entry
 points; synchronization and the configuration panel are not implemented.
 There is no installable release yet.
 
-Target environment: Windows, Painter 11.0, Unreal Editor 5.7.4 and Topia Engine
-5.7.4. Compatibility and performance remain unverified in those hosts.
+Target environment: Windows, Painter 11.0 and the official Unreal Editor 5.7.4.
+Partial M0 prototype evidence exists for both hosts
+([record](docs/history/m0-host-validation.md)); the plug-in itself and
+production scenes remain unverified.
 
 ## Planned workflow
 
@@ -47,7 +49,11 @@ With Python 3.10 or newer, run the scaffold checks:
 ```powershell
 python tools/validate_project.py
 python -m compileall -q plugins
+python -m unittest discover -s prototypes/m0/tests
 ```
+
+[prototypes/m0](prototypes/m0/README.md) holds the M0 host probes; they are not
+installed with the plug-in.
 
 These checks do not establish host compatibility. Implementation and host tests
 belong to the [M0 validation](https://github.com/Alexis-Li/StoUTextureSync/issues/2)
