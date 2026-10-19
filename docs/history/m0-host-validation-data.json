@@ -2,8 +2,7 @@
  "purpose": "M0 host measurements summarized from probe logs (issue #2); no paths or asset contents.",
  "hosts": {
   "painter": "11.0.0 (Python 3.11.6)",
-  "unreal_editor": "5.7.4-51494982+++UE5+Release-5.7 (official)",
-  "topia_engine": "not tested"
+  "unreal_editor": "5.7.4-51494982+++UE5+Release-5.7 (official)"
  },
  "machine": {
   "os": "Windows 11 Pro 10.0.26300",

@@ -11,10 +11,10 @@ The project is in prototyping. Version `0.0.0` contains empty Painter entry
 points; synchronization and the configuration panel are not implemented.
 There is no installable release yet.
 
-Target environment: Windows, Painter 11.0, Unreal Editor 5.7.4 and Topia Engine
-5.7.4. Partial M0 prototype evidence exists for Painter 11.0 and the official
-Unreal Editor 5.7.4 ([record](docs/history/m0-host-validation.md)); the plug-in
-itself, Topia Engine and production scenes remain unverified.
+Target environment: Windows, Painter 11.0 and the official Unreal Editor 5.7.4.
+Partial M0 prototype evidence exists for both hosts
+([record](docs/history/m0-host-validation.md)); the plug-in itself and
+production scenes remain unverified.
 
 ## Planned workflow
 

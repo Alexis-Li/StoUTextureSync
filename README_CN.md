@@ -10,9 +10,9 @@ Unreal Engine 中已有的 Texture 资产。
 项目处于原型阶段。`0.0.0` 只有 Painter 空入口，同步功能和配置面板尚未实现，
 当前没有可安装的发布版本。
 
-目标环境为 Windows、Painter 11.0、Unreal Editor 5.7.4 与 Topia Engine 5.7.4。
-M0 原型已在 Painter 11.0 与官方 Unreal Editor 5.7.4 中取得部分证据
-（[记录](docs/history/m0-host-validation.md)）；插件本身、Topia Engine 及正式场景仍待验证。
+目标环境为 Windows、Painter 11.0 与官方 Unreal Editor 5.7.4。
+M0 原型已在这两个宿主中取得部分证据（[记录](docs/history/m0-host-validation.md)）；
+插件本身及正式场景仍待验证。
 
 ## 预定使用流程
 

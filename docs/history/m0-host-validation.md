@@ -6,10 +6,9 @@ Tools: [prototypes/m0](../../prototypes/m0/README.md). Measurements:
 [m0-host-validation-data.json](m0-host-validation-data.json).
 
 State: **partial host evidence, not M0 closure**. Painter 11.0 and the official
-Unreal Editor 5.7.4 were exercised by scripted probes on synthetic samples. Topia
-Engine 5.7.4, production samples, hand painting with a tablet and the user's
-judgement of interaction stalls are still open, and `DEC-01` is a
-recommendation awaiting the user's decision.
+Unreal Editor 5.7.4 were exercised by scripted probes on synthetic samples.
+Production samples, hand painting with a tablet and the user's judgement of interaction stalls are still open. `DEC-01` was decided by the
+user on 2026-10-19 as recommended below ([ADR 0002](../adr/0002-route-a-auto-reimport.md)).
 
 ## Conclusions so far
 
@@ -72,7 +71,7 @@ recommendation awaiting the user's decision.
    file only when its content differs from what UE imported (changes are
    detected by file hash), which is the recovery FR-03.7 needs.
 
-## Recommendation for DEC-01
+## DEC-01 recommendation (accepted)
 
 Route A (file publication + UE Auto Reimport) with the configuration in item 2;
 POC-06 (directed reimport) not triggered because no core blocker was found.
@@ -83,8 +82,6 @@ not "UE complete"; UE association checks remain the user's.
 
 ## Open items before closure
 
-- Topia Engine 5.7.4: not run; the user excluded that installation from
-  automated testing. Needs the user or a separate test copy.
 - Production clothing and body samples, real layer stacks, 9–18 outputs; SP
   manual export comparison with colour-block channels; preset reselection and
   missing-resource cases.
