@@ -41,8 +41,8 @@ registration and pinned commit. Do not change sibling projects.
 - Follow docs/workflow.md for Issue/PR work: feature/<topic> or fix/<topic>
   branches with a PR to main, `Refs #<issue>` (never closing keywords), full
   base/head SHAs, AC and R- finding IDs, a published review of the exact head
-  SHA before every merge, `--match-head-commit` merges, one status comment per
-  issue and explicit closure. Small documentation and rule edits may be
+  SHA before every merge, `--match-head-commit` merges, issue comments tidied
+  on the user's request and explicit closure. Small documentation and rule edits may be
   committed directly to main as docs/workflow.md defines. Merge, closure and
   comment deletion follow the user's authorization. Preserve unrelated work and
   never rewrite shared history.

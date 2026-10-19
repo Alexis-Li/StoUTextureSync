@@ -12,7 +12,7 @@ information goes and when a task is finished.
 | Requirements not yet delivered, phase assignment, product decisions | Product issue [#1](https://github.com/Alexis-Li/StoUTextureSync/issues/1) |
 | Milestone scope, acceptance criteria, exclusions, dependencies | Milestone issue (M0 [#2](https://github.com/Alexis-Li/StoUTextureSync/issues/2), M1 [#3](https://github.com/Alexis-Li/StoUTextureSync/issues/3), later ones created the same way) |
 | Diff, code review, findings and local checks | Pull request |
-| Issue progress, decisions in force, host acceptance results | The issue's status comment |
+| Issue progress, reviews without a PR, host acceptance results | Comments on the issue |
 | Current behavior, installation, limits, recovery | `README.md` / `README_CN.md` |
 | Vocabulary and architecture decisions | [CONTEXT.md](../CONTEXT.md), [docs/adr/](adr/) |
 | Released and unreleased changes | [CHANGELOG.md](../CHANGELOG.md) |
@@ -49,7 +49,7 @@ IDs are never renumbered or reused; a dropped item keeps its ID and says why.
    comment, an ADR and issue #1 before dependent work starts.
 5. **Let decisions change.** Requirements and decisions can become outdated as
    development shows more. A changed decision is agreed with the user and then
-   rewritten in place wherever it lives (#1, milestone, ADR, status comment);
+   rewritten in place wherever it lives (#1, milestone, ADR, issue comments);
    the old wording is replaced, not kept beside the new one.
 
 M0 is a validation milestone: its deliverable is evidence and the `DEC-01`
@@ -89,9 +89,9 @@ one-off harnesses stay in scratch.
   user's merge authorization does not replace it. Merge with
   `gh pr merge --match-head-commit <reviewed-head>` and note the resulting
   `main` SHA on the PR. Merge follows the user's authorization.
-- **Update the issue.** Edit the issue's status comment: PR and commits, AC
-  covered, state reached (implemented, reviewed, merged, host-verified) and
-  what remains.
+- **Update the issue.** Comment on the issue: PR and commits, AC covered,
+  state reached (implemented, reviewed, merged, host-verified) and what
+  remains.
 
 Ordinary checks (`tools/validate_project.py`, compileall, unit tests, CI) are
 local evidence only. They never establish host compatibility.
@@ -100,8 +100,8 @@ local evidence only. They never establish host compatibility.
 
 Events, export, UI, file publication timing, UE reimport and lifecycle need
 evidence in the declared hosts: Painter 11.0 and the official Unreal Editor
-5.7.4. Record the results in the acceptance section of the milestone (or child)
-issue's status comment. It states:
+5.7.4. Record the results as an acceptance comment on the milestone (or child)
+issue. It states:
 
 - tested commit (full SHA) or package name and version;
 - exact host builds, OS and the relevant machine facts (for example 32GB RAM
@@ -119,8 +119,8 @@ memory peaks, visual owner acceptance) go into a history record at closure.
 
 ## 4. Closure
 
-Close a milestone issue explicitly once its status comment shows the final
-review, the integration SHA on `main` and the host acceptance results, and:
+Close a milestone issue explicitly, with a comment that links the final review,
+the integration SHA on `main` and the host acceptance results, when:
 
 - every AC is met, or dropped or moved with the user's recorded decision;
 - no blocking `R-xxx` finding is open;
@@ -162,20 +162,21 @@ future decision or regression check will need: the route decision rationale,
 host measurements, owner visual acceptance, hard-to-reproduce failures. Extend
 an existing topic record before creating one.
 
-Issue comments are working material, not a permanent record. When a comment's
-content still matters, merge it into the status comment or its maintained
-owner (ADR, #1, README, `docs/history/`), then delete the comment; outdated
-content is simply dropped. Git does not keep remote comments, so anything a
-future decision or regression check needs must reach a repository owner first.
+Issue comments are working material, not a permanent record: progress, review
+and acceptance comments are added as work goes on. When the user asks to tidy
+an issue's comments, merge what still matters into one status comment (format
+below) or its maintained owner (ADR, #1, README, `docs/history/`) and delete
+the rest; outdated content is simply dropped. Git does not keep remote
+comments, so anything a future decision or regression check needs must reach a
+repository owner first.
 Remove task-owned scratch after the evidence it held is preserved.
 
 ## Issue status comment
 
-Each issue has at most one agent-maintained status comment. It is edited in
-place as work progresses and always describes the current state; other comments
-are merged into it and deleted as described under Archival. Write it as the
-current fact: no change logs, "updated per request" notes or labels for what was
-removed.
+Tidying an issue's comments on the user's request produces one status comment
+in this format; new comments then accumulate again until the next tidy. Like
+every comment, it states the current fact: no change logs, "updated per
+request" notes or labels for what was removed.
 
 ```markdown
 <!-- issue-status:v1 issue=2 -->
