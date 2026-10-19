@@ -5,10 +5,11 @@ requirements in [#1](https://github.com/Alexis-Li/StoUTextureSync/issues/1).
 Tools: [prototypes/m0](../../prototypes/m0/README.md). Measurements:
 [m0-host-validation-data.json](m0-host-validation-data.json).
 
-State: **partial host evidence, not M0 closure**. Painter 11.0 and the official
-Unreal Editor 5.7.4 were exercised by scripted probes on synthetic samples.
-Production samples, hand painting with a tablet and the user's judgement of interaction stalls are still open. `DEC-01` was decided by the
-user on 2026-10-19 as recommended below ([ADR 0002](../adr/0002-route-a-auto-reimport.md)).
+State: Painter 11.0 and the official Unreal Editor 5.7.4 were exercised by
+scripted probes on synthetic samples. `DEC-01` selects route A
+([ADR 0002](../adr/0002-route-a-auto-reimport.md)). Validation on production
+samples and the plug-in itself belongs to
+[M1](https://github.com/Alexis-Li/StoUTextureSync/issues/3).
 
 ## Conclusions so far
 
@@ -71,7 +72,7 @@ user on 2026-10-19 as recommended below ([ADR 0002](../adr/0002-route-a-auto-rei
    file only when its content differs from what UE imported (changes are
    detected by file hash), which is the recovery FR-03.7 needs.
 
-## DEC-01 recommendation (accepted)
+## DEC-01
 
 Route A (file publication + UE Auto Reimport) with the configuration in item 2;
 POC-06 (directed reimport) not triggered because no core blocker was found.
@@ -80,20 +81,15 @@ wait, UE threshold 1.0 s (0.3–0.5 s if the budget needs it), 1K default.
 Route A's limits stay as documented: the panel can report "file published",
 not "UE complete"; UE association checks remain the user's.
 
-## Open items before closure
+## Limits of this evidence
 
-- Production clothing and body samples, real layer stacks, 9–18 outputs; SP
-  manual export comparison with colour-block channels; preset reselection and
-  missing-resource cases.
-- Hand painting with a tablet: focus, stroke continuity, stall acceptance.
+- Synthetic samples and scripted edits only: no production clothing or body
+  projects, no hand painting, no comparison with a manual SP export.
 - Focus: in 4 of 38 trials UE became foreground after a reimport while the user
-  was working in other applications; not attributable from these runs and must
-  be re-tested with the machine idle.
-- Resource baseline (RAM, commit, paging, VRAM) with both hosts open; viewport
-  visibility time; baking and material-parameter events; SP exit during
-  publication, disk full, no permission and cache loss in the hosts.
-  Write-lock, partial publication and stale-batch logic are covered only by
-  project tests.
+  was working in other applications; not attributable from these runs.
+- Not measured: resource baseline with both hosts open, viewport visibility,
+  baking and material-parameter events, host failure injection. Write-lock,
+  partial publication and stale-batch logic are covered only by project tests.
 
 ## Baseline
 

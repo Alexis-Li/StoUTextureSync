@@ -29,8 +29,7 @@ it and no maintained owner already answers it, for example:
 
 - the rationale and evidence behind a route decision such as `DEC-01`;
 - host measurements, calibration inputs and owner visual acceptance;
-- hard-to-reproduce failures and their confirmed cause;
-- JSON archives of issue comments saved before those comments are deleted.
+- hard-to-reproduce failures and their confirmed cause.
 
 Routine PR checks, repeated successful runs, debugging rounds and publication
 receipts stay in the PR or issue.

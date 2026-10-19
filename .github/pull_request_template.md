@@ -15,8 +15,8 @@ Note exclusions and compatibility impact.
 ## Validation
 
 List the checks actually run and their result. Repository checks and CI do not
-establish host behavior; link host acceptance reports, or name the hosts and
-scenarios still unverified.
+establish host behavior; link the issue's host acceptance results, or name the
+hosts and scenarios still unverified.
 
 ## Remaining work
 

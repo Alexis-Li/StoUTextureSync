@@ -1,9 +1,9 @@
 # Route A: publish source images and rely on UE Auto Reimport (DEC-01)
 
-Decided by the user on 2026-10-19 on
-[M0](https://github.com/Alexis-Li/StoUTextureSync/issues/2#issuecomment-6262766661),
-from the evidence in [m0-host-validation](../history/m0-host-validation.md).
-It confirms the initial direction of [ADR 0001](0001-file-based-sync.md).
+Decided by the user on 2026-10-19 in
+[M0](https://github.com/Alexis-Li/StoUTextureSync/issues/2), from the evidence
+in [m0-host-validation](../history/m0-host-validation.md). It confirms the
+initial direction of [ADR 0001](0001-file-based-sync.md).
 
 Painter publishes each validated output by writing a temporary file beside the
 target and atomically replacing it; the official Unreal Editor 5.7.4 updates the

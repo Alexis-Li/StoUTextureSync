@@ -29,8 +29,9 @@ registration and pinned commit. Do not change sibling projects.
 
 ## Documentation and delivery
 
-- README.md and README_CN.md are aligned current manuals. Edit whole workflows
-  in place; omit development diaries and superseded correction narratives.
+- README.md and README_CN.md are aligned current manuals. Write every document,
+  issue and comment as the current state and edit it in place; omit
+  development diaries, change notes and labels for what was removed.
 - Keep vocabulary in CONTEXT.md, durable decisions in docs/adr/, release changes
   in CHANGELOG.md, and requirements/unresolved work in Issues. When a milestone
   closes, move its delivered requirements to their maintained owners and trim
@@ -40,13 +41,14 @@ registration and pinned commit. Do not change sibling projects.
 - Follow docs/workflow.md for Issue/PR work: feature/<topic> or fix/<topic>
   branches with a PR to main, `Refs #<issue>` (never closing keywords), full
   base/head SHAs, AC and R- finding IDs, a published review of the exact head
-  SHA before every merge, `--match-head-commit` merges, host acceptance reports
-  and explicit closure. Small documentation and rule edits may be committed
-  directly to main as docs/workflow.md defines. Agent reports on issues use its
-  report format. Merge, closure and comment deletion follow the user's
-  authorization. Preserve unrelated work and never rewrite shared history.
-- Use gh from this clone. Re-read an issue before editing, preserve user
-  decisions and existing comments, and use UTF-8 body files for multiline text.
+  SHA before every merge, `--match-head-commit` merges, one status comment per
+  issue and explicit closure. Small documentation and rule edits may be
+  committed directly to main as docs/workflow.md defines. Merge, closure and
+  comment deletion follow the user's authorization. Preserve unrelated work and
+  never rewrite shared history.
+- Use gh from this clone. Re-read an issue and its comments before editing,
+  keep decisions in force, rewrite outdated ones in place once the user agrees,
+  and use UTF-8 body files for multiline text.
   Never publish machine-specific paths, credentials or private asset contents.
   Report the state reached precisely: implemented, reviewed, merged,
   host-verified or released.

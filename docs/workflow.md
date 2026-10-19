@@ -12,7 +12,7 @@ information goes and when a task is finished.
 | Requirements not yet delivered, phase assignment, product decisions | Product issue [#1](https://github.com/Alexis-Li/StoUTextureSync/issues/1) |
 | Milestone scope, acceptance criteria, exclusions, dependencies | Milestone issue (M0 [#2](https://github.com/Alexis-Li/StoUTextureSync/issues/2), M1 [#3](https://github.com/Alexis-Li/StoUTextureSync/issues/3), later ones created the same way) |
 | Diff, code review, findings and local checks | Pull request |
-| Host acceptance evidence | Host acceptance report on the milestone issue |
+| Issue progress, decisions in force, host acceptance results | The issue's status comment |
 | Current behavior, installation, limits, recovery | `README.md` / `README_CN.md` |
 | Vocabulary and architecture decisions | [CONTEXT.md](../CONTEXT.md), [docs/adr/](adr/) |
 | Released and unreleased changes | [CHANGELOG.md](../CHANGELOG.md) |
@@ -45,8 +45,12 @@ IDs are never renumbered or reused; a dropped item keeps its ID and says why.
    pieces (one PoC, one host component). Each child starts with
    `Part of #<milestone>` and owns its own acceptance; the milestone links them.
 4. **Decide before building.** A `DEC-xx` decision (for example the M0 route
-   choice) is recorded as a user-confirmed comment on its milestone, then
-   moved to an ADR and reflected in issue #1 before dependent work starts.
+   choice) is confirmed by the user, written into the milestone's status
+   comment, an ADR and issue #1 before dependent work starts.
+5. **Let decisions change.** Requirements and decisions can become outdated as
+   development shows more. A changed decision is agreed with the user and then
+   rewritten in place wherever it lives (#1, milestone, ADR, status comment);
+   the old wording is replaced, not kept beside the new one.
 
 M0 is a validation milestone: its deliverable is evidence and the `DEC-01`
 route decision, not a releasable plug-in. Prototype code that must be kept
@@ -85,8 +89,9 @@ one-off harnesses stay in scratch.
   user's merge authorization does not replace it. Merge with
   `gh pr merge --match-head-commit <reviewed-head>` and note the resulting
   `main` SHA on the PR. Merge follows the user's authorization.
-- **Update the issue.** A short comment: PR link, AC covered, state reached
-  (implemented, reviewed, merged, host-verified) and the remaining gap.
+- **Update the issue.** Edit the issue's status comment: PR and commits, AC
+  covered, state reached (implemented, reviewed, merged, host-verified) and
+  what remains.
 
 Ordinary checks (`tools/validate_project.py`, compileall, unit tests, CI) are
 local evidence only. They never establish host compatibility.
@@ -95,9 +100,8 @@ local evidence only. They never establish host compatibility.
 
 Events, export, UI, file publication timing, UE reimport and lifecycle need
 evidence in the declared hosts: Painter 11.0 and the official Unreal Editor
-5.7.4. Record evidence as a host acceptance report on the
-milestone (or child) issue, using the report format below with kind
-`acceptance`. Each report states:
+5.7.4. Record the results in the acceptance section of the milestone (or child)
+issue's status comment. It states:
 
 - tested commit (full SHA) or package name and version;
 - exact host builds, OS and the relevant machine facts (for example 32GB RAM
@@ -115,8 +119,8 @@ memory peaks, visual owner acceptance) go into a history record at closure.
 
 ## 4. Closure
 
-Close a milestone issue explicitly, with a comment that links the final review,
-the integration SHA on `main` and the host acceptance reports, when:
+Close a milestone issue explicitly once its status comment shows the final
+review, the integration SHA on `main` and the host acceptance results, and:
 
 - every AC is met, or dropped or moved with the user's recorded decision;
 - no blocking `R-xxx` finding is open;
@@ -158,54 +162,51 @@ future decision or regression check will need: the route decision rationale,
 host measurements, owner visual acceptance, hard-to-reproduce failures. Extend
 an existing topic record before creating one.
 
-Deleting or substantially rewriting issue comments is a separate, requested
-closeout. Git does not keep remote comments, so before removing any, save the
-originals (ID, author, timestamps, URL, full body) in a JSON archive under
-`docs/history/`, publish it, compare it with the remote, and only then delete
-superseded agent reports. Human discussion and user decisions are never
-deleted. Remove task-owned scratch after the evidence it held is preserved.
+Issue comments are working material, not a permanent record. When a comment's
+content still matters, merge it into the status comment or its maintained
+owner (ADR, #1, README, `docs/history/`), then delete the comment; outdated
+content is simply dropped. Git does not keep remote comments, so anything a
+future decision or regression check needs must reach a repository owner first.
+Remove task-owned scratch after the evidence it held is preserved.
 
-## Issue report format
+## Issue status comment
 
-Formal agent reports on issues (development without a PR, review without a PR,
-host acceptance, current handoff) use this structure so they can be found and
-updated. There is no checker; verify it by reading the draft before publishing.
+Each issue has at most one agent-maintained status comment. It is edited in
+place as work progresses and always describes the current state; other comments
+are merged into it and deleted as described under Archival. Write it as the
+current fact: no change logs, "updated per request" notes or labels for what was
+removed.
 
 ```markdown
-<!-- issue-report:v1 kind=acceptance issue=2 key=acc-01 -->
-## 宿主验收
+<!-- issue-status:v1 issue=2 -->
+## 状态
 
-- 状态：通过 / 不通过 / 部分通过 / 证据不足
-- 基线：<full SHA or package version>
-- 范围：<AC/POC IDs covered>
-- 依据：<requirement and PR links>
-- 阻塞项：R-001, R-002 / 无
-- 本次验证：本轮执行 / 历史复核 / 混合 / 未执行
+- 状态：进行中 / 待审核 / 待验证 / 受阻 / 可关闭 / 已关闭
+- 基线：<main SHA or package version>
 - 更新日期：YYYY-MM-DD
 
-### 环境与样本
-### 步骤与结果
-### 未验证与限制
+### 简介
+### 相关提交
+### 已完成
+### 未完成
+### 开发边界
+### 决定
+### 宿主验收
 ### 下一步
 ```
 
-| Kind / title | Status values | Sections |
-| --- | --- | --- |
-| `development` / `## 开发交付` | 待审核 / 部分完成 / 受阻 | 交付结果, 验证与证据边界, 剩余事项, 下一步 |
-| `review` / `## 审核结论` | 通过 / 需修改 / 证据不足 | 结论, 审核问题, 验证与证据边界, 后续处理 |
-| `acceptance` / `## 宿主验收` | 通过 / 不通过 / 部分通过 / 证据不足 | 环境与样本, 步骤与结果, 未验证与限制, 下一步 |
-| `summary` / `## 当前结论` | 进行中 / 待审核 / 待验证 / 受阻 / 可关闭 / 已关闭 | 未闭环事项, 已验证成果与边界, 验证依据, 接手入口, 记录索引 |
+- 简介: what the issue delivers and where it stands, in a few sentences.
+- 相关提交: PRs and commits with full SHAs and a one-line summary each.
+- 已完成 / 未完成: by AC, PoC or requirement ID, with evidence links.
+- 开发边界: what is in and out of scope, and items moved to another issue.
+- 决定: decisions in force, linking their ADR or #1 section.
+- 宿主验收: the content listed in Host acceptance, or `无`.
+- 下一步: concrete next actions and who takes them.
 
-- Keys: `dev-01`, `review-01`, `acc-01`; the one summary per issue uses
-  `current`, created only when several deliveries or rounds make the next
-  action hard to find. A new baseline or a different conclusion gets a new
-  key; minor corrections are edited in place.
-- Write `无` in an empty section, never leave placeholders. Use
-  repository-relative paths or placeholders such as `<Painter11>` or
-  `<scratch>`, never drive letters or user directories.
-- Before publishing, read all comments (`gh issue view <n> --comments`) and
-  find an existing report with the same kind and key. Create with
-  `gh issue comment <n> --body-file <draft.md>`; edit an existing one by its
-  numeric comment ID through `gh api --method PATCH
-  repos/{owner}/{repo}/issues/comments/<id> --input <payload.json>`, after
-  re-reading it. Never use `--edit-last`.
+Write `无` in an empty section, never leave placeholders. Use
+repository-relative paths or placeholders such as `<Painter11>` or `<scratch>`,
+never drive letters or user directories. Before editing, re-read the issue and
+all its comments (`gh issue view <n> --comments`). Create the comment with
+`gh issue comment <n> --body-file <draft.md>`; edit it by its numeric ID through
+`gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> --input
+<payload.json>`. Never use `--edit-last`.
