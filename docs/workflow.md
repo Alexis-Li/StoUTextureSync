@@ -60,11 +60,13 @@ one-off harnesses stay in scratch.
 ## 2. Delivery and review
 
 - **Small direct changes.** Wording, typo, link and formatting fixes, and
-  small edits to rules, the workflow, templates or `CHANGELOG.md`, may be
-  committed directly to `main` without a branch or PR when they change no code,
-  tests, tools, CI, packaging, version, ADR or product decision. Run
-  `tools/validate_project.py` first, push a normal commit (never rewrite
-  `main`), and use a PR whenever the size or impact is unclear.
+  small edits to rules, the workflow, templates or `CHANGELOG.md`, are
+  committed to the branch currently being worked on, without a separate branch
+  or PR, when they change no code, tests, tools, CI, packaging, version, ADR or
+  product decision. They reach `main` with that branch; only when no
+  development branch is in progress is the current branch `main` itself. Run
+  `tools/validate_project.py` first, push a normal commit (never rewrite shared
+  history), and use a PR whenever the size or impact is unclear.
 - **Branch.** Everything else goes through a PR: development tasks, code
   changes and significant changes. Work on `feature/<topic>` for new
   capability, tooling or documentation, or `fix/<topic>` for corrections,

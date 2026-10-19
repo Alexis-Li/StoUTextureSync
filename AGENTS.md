@@ -43,7 +43,7 @@ registration and pinned commit. Do not change sibling projects.
   base/head SHAs, AC and R- finding IDs, a published review of the exact head
   SHA before every merge, `--match-head-commit` merges, issue comments tidied
   on the user's request and explicit closure. Small documentation and rule
-  edits may be committed directly to main as docs/workflow.md defines. Merge,
+  edits go on the current branch as docs/workflow.md defines. Merge,
   closure and comment deletion follow the user's authorization. Preserve
   unrelated work and never rewrite shared history.
 - Use gh from this clone. Re-read an issue and its comments before editing,
