@@ -55,8 +55,11 @@ one-off harnesses stay in scratch.
 
 ## 2. Delivery and review
 
-- **Branch.** Work on `codex/<topic>` from `main` and open a PR back to `main`.
-  Use one PR per reviewable piece; a milestone usually has several.
+- **Branch.** Work on `feature/<topic>` for new capability, tooling or
+  documentation, or `fix/<topic>` for corrections, branched from `main`, and
+  open a PR back to `main`. Use a short kebab-case topic and one PR per
+  reviewable piece; a milestone usually has several. GitHub deletes the head
+  branch when the PR is merged.
 - **Describe the delivery.** The PR template records the issue and AC/finding
   IDs covered, the full base and head SHAs, the checks actually run and what
   remains. Use `Refs #<issue>`, never a closing keyword: merging into `main`
@@ -71,9 +74,10 @@ one-off harnesses stay in scratch.
 - **Re-review after change.** Approval covers the stated SHA. Later commits or
   `main` drift that touch the reviewed scope need an incremental review and the
   affected checks before merge.
-- **Merge.** Merge with `gh pr merge --match-head-commit <reviewed-head>` and
-  note the resulting `main` SHA on the PR. Merge follows the user's
-  authorization.
+- **Merge.** Merge only after the review of the head SHA is published; the
+  user's merge authorization does not replace it. Merge with
+  `gh pr merge --match-head-commit <reviewed-head>` and note the resulting
+  `main` SHA on the PR. Merge follows the user's authorization.
 - **Update the issue.** A short comment: PR link, AC covered, state reached
   (implemented, reviewed, merged, host-verified) and the remaining gap.
 
