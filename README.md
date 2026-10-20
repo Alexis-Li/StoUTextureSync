@@ -69,8 +69,8 @@ python tools/package_sp.py           # build dist/StoUTextureSync-<version>-SP.z
 The archive contains one `stou_texture_sync/` folder with the runtime Python
 files and the LICENSE; it is meant to be extracted into Painter's
 `<Documents>/Adobe/Adobe Substance 3D Painter/python/plugins` folder. Any other
-file in the runtime folder stops the build. Installing from the archive has not
-yet been verified in Painter.
+file in the runtime folder, or syntax newer than Painter's Python 3.11, stops
+the build. Installing from the archive has not yet been verified in Painter.
 
 [prototypes/m0](prototypes/m0/README.md) holds the M0 host probes; they are not
 installed with the plug-in.

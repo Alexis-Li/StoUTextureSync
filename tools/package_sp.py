@@ -3,14 +3,16 @@
 The archive holds one top-level ``stou_texture_sync/`` folder, ready to be
 extracted into Painter's ``python/plugins`` directory. It contains the runtime
 Python files and the project LICENSE, nothing else. Bytecode caches are
-skipped; any other file in the runtime folder stops the build so that nothing
-is shipped or dropped unnoticed. Entries carry a fixed timestamp, so the same
-sources produce the same archive bytes.
+skipped; any other file in the runtime folder, or syntax newer than Painter's
+Python 3.11, stops the build so that nothing is shipped or dropped unnoticed.
+Entries carry a fixed timestamp, and LICENSE is checked out with LF endings,
+so the same sources produce the same archive bytes.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import os
 import sys
@@ -29,6 +31,9 @@ RUNTIME_SUFFIXES = {".py"}
 CACHE_DIRS = {"__pycache__"}
 CACHE_SUFFIXES = {".pyc", ".pyo"}
 ZIP_DATE = (1980, 1, 1, 0, 0, 0)
+# Painter 11.0 runs Python 3.11; newer syntax is rejected even when the build
+# interpreter accepts it (ast feature_version is best effort).
+PAINTER_PYTHON = (3, 11)
 
 
 class PackageError(Exception):
@@ -51,7 +56,9 @@ def runtime_files(root: Path = ROOT) -> dict[str, Path]:
             unexpected.append(relative.as_posix())
             continue
         try:
-            compile(path.read_bytes(), str(path), "exec", dont_inherit=True)
+            source = path.read_bytes()
+            compile(source, str(path), "exec", dont_inherit=True)
+            ast.parse(source, str(path), feature_version=PAINTER_PYTHON)
         except (SyntaxError, ValueError) as exc:
             raise PackageError(f"cannot compile {relative.as_posix()}: {exc}") from exc
         members[f"{PACKAGE}/{relative.as_posix()}"] = path

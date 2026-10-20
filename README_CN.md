@@ -60,7 +60,8 @@ python tools/package_sp.py           # 生成 dist/StoUTextureSync-<version>-SP.
 中 `Unreleased` 下的条目移到该版本的标题下。归档只含一个 `stou_texture_sync/`
 目录，内有运行所需的 Python 文件和 LICENSE，用于解压到 Painter 的
 `<Documents>/Adobe/Adobe Substance 3D Painter/python/plugins` 目录。运行目录中
-出现其他文件时停止打包。从归档安装尚未在 Painter 中验证。
+出现其他文件或使用了高于 Painter Python 3.11 的语法时停止打包。从归档安装尚未在
+Painter 中验证。
 
 [prototypes/m0](prototypes/m0/README.md) 保存 M0 宿主探针，不随插件安装。
 

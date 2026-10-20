@@ -4,10 +4,12 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "tools"))
 
+import version  # noqa: E402
 from package_sp import PackageError, archive_name, build  # noqa: E402
 from version import VersionError, read_version, release_changelog, set_version  # noqa: E402
 
@@ -57,6 +59,23 @@ class VersionTest(unittest.TestCase):
         with self.assertRaises(VersionError):
             set_version("0.2.0", self.root)
         self.assertEqual(read_version(self.root), "0.1.0")
+
+    def test_failed_second_replace_restores_the_first_file(self):
+        real_replace = version.os.replace
+        calls = []
+
+        def failing_replace(src, dst):
+            calls.append(dst)
+            if len(calls) == 2:
+                raise OSError("disk full")
+            real_replace(src, dst)
+
+        with mock.patch.object(version.os, "replace", failing_replace), self.assertRaises(OSError):
+            set_version("0.2.0", self.root, date="2026-10-20")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(read_version(self.root), "0.1.0")
+        self.assertEqual((self.root / "CHANGELOG.md").read_text(encoding="utf-8"), CHANGELOG)
+        self.assertEqual(sorted(p.name for p in self.root.rglob(".*version-tmp")), [])
 
     def test_changelog_needs_one_unreleased_heading(self):
         with self.assertRaises(VersionError):
@@ -111,6 +130,12 @@ class PackageTest(unittest.TestCase):
     def test_syntax_error_stops_the_build(self):
         (self.package / "broken.py").write_text("def (:\n", encoding="utf-8")
         with self.assertRaisesRegex(PackageError, "broken.py"):
+            build(self.out, self.root)
+
+    @unittest.skipIf(sys.version_info < (3, 12), "needs an interpreter that accepts 3.12 syntax")
+    def test_syntax_newer_than_painter_python_stops_the_build(self):
+        (self.package / "modern.py").write_text("type Alias = int\n", encoding="utf-8")
+        with self.assertRaisesRegex(PackageError, "modern.py"):
             build(self.out, self.root)
 
     def test_invalid_project_stops_the_build(self):

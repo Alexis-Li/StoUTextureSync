@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 import re
 from pathlib import Path
 
@@ -69,9 +70,30 @@ def set_version(new: str, root: Path = ROOT, date: str | None = None) -> str:
     changelog_text = release_changelog(
         changelog_text, new, date or datetime.date.today().isoformat())
     entry_text = VERSION_LINE.sub(f'__version__ = "{new}"', entry_text)
-    (root / ENTRY).write_text(entry_text, encoding="utf-8", newline="\n")
-    (root / CHANGELOG).write_text(changelog_text, encoding="utf-8", newline="\n")
+    _replace_together({root / CHANGELOG: changelog_text, root / ENTRY: entry_text})
     return old
+
+
+def _replace_together(contents: dict[Path, str]) -> None:
+    """Write every file or none: stage complete temporary files, then replace
+    them in order, restoring the already replaced ones if a later step fails."""
+    staged, replaced = {}, []
+    try:
+        for path, text in contents.items():
+            temp = path.with_name(f".{path.name}.version-tmp")
+            temp.write_text(text, encoding="utf-8", newline="\n")
+            staged[path] = temp
+        for path, temp in staged.items():
+            original = path.read_bytes()
+            os.replace(temp, path)
+            replaced.append((path, original))
+    except BaseException:
+        for path, original in reversed(replaced):
+            path.write_bytes(original)
+        raise
+    finally:
+        for temp in staged.values():
+            temp.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
