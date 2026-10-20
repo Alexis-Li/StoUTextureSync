@@ -50,7 +50,27 @@ With Python 3.10 or newer, run the scaffold checks:
 python tools/validate_project.py
 python -m compileall -q plugins
 python -m unittest discover -s prototypes/m0/tests
+python -m unittest discover -s tests
 ```
+
+### Versions and packaging
+
+The `__version__` in `plugins/stou_texture_sync/__init__.py` is the single
+product version.
+
+```powershell
+python tools/version.py              # print the version
+python tools/version.py set 0.1.0    # set it and release the CHANGELOG entries
+python tools/package_sp.py           # build dist/StoUTextureSync-<version>-SP.zip
+```
+
+`set` accepts only a greater `MAJOR.MINOR.PATCH` version and moves the
+`Unreleased` entries of [CHANGELOG.md](CHANGELOG.md) under a heading for it.
+The archive contains one `stou_texture_sync/` folder with the runtime Python
+files and the LICENSE; it is meant to be extracted into Painter's
+`<Documents>/Adobe/Adobe Substance 3D Painter/python/plugins` folder. Any other
+file in the runtime folder, or syntax newer than Painter's Python 3.11, stops
+the build. Installing from the archive has not yet been verified in Painter.
 
 [prototypes/m0](prototypes/m0/README.md) holds the M0 host probes; they are not
 installed with the plug-in.

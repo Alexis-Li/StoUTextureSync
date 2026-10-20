@@ -43,7 +43,25 @@ Texture Set 命名。自动与手动同步使用相同质量及所选 Painter �
 python tools/validate_project.py
 python -m compileall -q plugins
 python -m unittest discover -s prototypes/m0/tests
+python -m unittest discover -s tests
 ```
+
+### 版本与打包
+
+`plugins/stou_texture_sync/__init__.py` 中的 `__version__` 是唯一的产品版本。
+
+```powershell
+python tools/version.py              # 显示版本
+python tools/version.py set 0.1.0    # 设置版本并发布 CHANGELOG 条目
+python tools/package_sp.py           # 生成 dist/StoUTextureSync-<version>-SP.zip
+```
+
+`set` 只接受更大的 `MAJOR.MINOR.PATCH` 版本，并把 [CHANGELOG.md](CHANGELOG.md)
+中 `Unreleased` 下的条目移到该版本的标题下。归档只含一个 `stou_texture_sync/`
+目录，内有运行所需的 Python 文件和 LICENSE，用于解压到 Painter 的
+`<Documents>/Adobe/Adobe Substance 3D Painter/python/plugins` 目录。运行目录中
+出现其他文件或使用了高于 Painter Python 3.11 的语法时停止打包。从归档安装尚未在
+Painter 中验证。
 
 [prototypes/m0](prototypes/m0/README.md) 保存 M0 宿主探针，不随插件安装。
 
