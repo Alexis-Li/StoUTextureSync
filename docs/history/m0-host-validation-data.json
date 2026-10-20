@@ -1,5 +1,5 @@
 {
- "purpose": "M0 host measurements summarized from probe logs (issue #2); no paths or asset contents.",
+ "purpose": "M0 host measurements, a hand-made summary of probe logs (issue #2); no paths or asset contents. The raw probe logs were not retained and no script regenerates this file, so fields that are absent here (settings kept, material references, assets created, bit depth, channel layout, per-trial duplicates, dirty state) are not recoverable from it.",
  "hosts": {
   "painter": "11.0.0 (Python 3.11.6)",
   "unreal_editor": "5.7.4-51494982+++UE5+Release-5.7 (official)"
@@ -713,7 +713,7 @@
    "last_median_s": 1.603,
    "last_max_s": 1.726,
    "md5_matches_published": true,
-   "ue_became_foreground": 1
+   "foreground_trials": 1
   },
   {
    "series": "part3_min_thr1_throttle",
@@ -726,7 +726,7 @@
    "last_median_s": 1.588,
    "last_max_s": 1.678,
    "md5_matches_published": true,
-   "ue_became_foreground": 0
+   "foreground_trials": 0
   },
   {
    "series": "direct_slow_bg_throttle",
@@ -739,7 +739,7 @@
    "last_median_s": 1.0385,
    "last_max_s": 1.04,
    "md5_matches_published": true,
-   "ue_became_foreground": 0
+   "foreground_trials": 0
   },
   {
    "series": "part3_bg_thr1_nothrottle",
@@ -752,7 +752,7 @@
    "last_median_s": 1.624,
    "last_max_s": 1.707,
    "md5_matches_published": true,
-   "ue_became_foreground": 1
+   "foreground_trials": 1
   },
   {
    "series": "part3_min_thr1_nothrottle",
@@ -765,7 +765,7 @@
    "last_median_s": 1.586,
    "last_max_s": 1.694,
    "md5_matches_published": true,
-   "ue_became_foreground": 0
+   "foreground_trials": 0
   },
   {
    "series": "all12_bg_thr1_nothrottle",
@@ -778,7 +778,7 @@
    "last_median_s": 2.829,
    "last_max_s": 2.96,
    "md5_matches_published": true,
-   "ue_became_foreground": 0
+   "foreground_trials": 0
   },
   {
    "series": "all12_2k_bg_thr1_nothrottle",
@@ -791,7 +791,7 @@
    "last_median_s": 3.129,
    "last_max_s": 3.184,
    "md5_matches_published": true,
-   "ue_became_foreground": 0
+   "foreground_trials": 0
   },
   {
    "series": "part3_bg_thr03_nothrottle",
@@ -804,7 +804,7 @@
    "last_median_s": 0.972,
    "last_max_s": 1.049,
    "md5_matches_published": true,
-   "ue_became_foreground": 2
+   "foreground_trials": 2
   },
   {
    "series": "single_bg_thr03_nothrottle",
@@ -817,7 +817,7 @@
    "last_median_s": 0.331,
    "last_max_s": 0.334,
    "md5_matches_published": true,
-   "ue_became_foreground": 0
+   "foreground_trials": 0
   }
  ],
  "ue_offline": {
@@ -837,8 +837,8 @@
    "quit_s": 2.8,
    "startup_reimports": [],
    "recorded_after_restart": {
-    "T_C00_Leg_ARM.png": "online_unsaved",
-    "T_C00_Leg_Albedo.png": "online_unsaved"
+    "T_C00_Leg_ARM.png": "online_content",
+    "T_C00_Leg_Albedo.png": "online_content"
    },
    "identical_republish_reimported": [
     "T_C00_Leg_ARM",
@@ -980,5 +980,29 @@
    "e2e_s": 9.794,
    "ue_s": 1.04
   }
- ]
+ ],
+ "ue_auto_reimport_notes": {
+  "foreground_trials": "Trials in which UE was the foreground process before or after the trial (bench rule: foreground_before or foreground_after is UE). It does not show that the reimport moved UE to the front; the user was working in other applications during these runs.",
+  "reimport_totals": "n x files: 176 atomic reimports in the series above plus 2 slow direct writes; the end-to-end series adds 20 (5 single-Tile x 1 file, 5 all-Tile x 3 files).",
+  "dedup": "UE broadcasts OnAssetReimport twice per import; the bench merges records with the same (asset, MD5), which would also merge a genuine repeat import of identical content."
+ },
+ "ue_offline_notes": {
+  "online_content": "UE's recorded source MD5 after restart equals the content published while UE was online (the offline change was not picked up); 'offline' means it equals the content published while UE was closed.",
+  "scope": "One run per setting, 2 files, normal editor quit (no crash or forced kill); the observation window after restart was a fixed 8 s, the reimport time was not recorded."
+ },
+ "end_to_end_notes": {
+  "whole_set": "The all-Tile edit changed 3 files (published 3, dedup skipped 9); the single-Tile edit changed 1. Sizes are 1K and the UE source images are near-solid PNGs in an empty project.",
+  "tile_1001_then_disabled": "Real-time was switched off 0.2 s after the edit (during the idle wait); the single batch at sp_s 8.754 s is the manual immediate sync run about 8 s later."
+ },
+ "texture_events_notes": {
+  "runs": "One run per throttle setting.",
+  "zero_event_edits": "hide_layer, insert_paint_layer_empty and show_layer_roughness_only produced no events; whether those layers held content that affects the export was not recorded."
+ },
+ "stall_notes": {
+  "heartbeat": "10 ms Qt timer; stall_ms is the largest gap between ticks during one export. stall_light is empty (no light-case stall was kept) and no idle baseline was recorded.",
+  "p95": "With n=7, p95_ms equals max_ms."
+ },
+ "export_light_notes": {
+  "distinct_sha": "distinct_sha 3 over 12 files means the four Tiles of each output carry identical content in this sample, so file content cannot show a Tile mix-up."
+ }
 }

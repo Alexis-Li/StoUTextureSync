@@ -17,6 +17,7 @@ in [docs/history/m0-host-validation.md](../../docs/history/m0-host-validation.md
 | `ue_make_project.py` | outside | Disposable UE 5.7 content-only project with route A Auto Reimport settings |
 | `ue_probe.py` | Unreal Editor 5.7 | First import, settings and material references; logs every reimport |
 | `ue_publish_bench.py` | outside | Publishes source images and times UE reimport per window/CPU setting |
+| `ue_make_sources.py` | outside | Writes the 12 near-solid source images the UE probes start from |
 | `png_tools.py` | outside | Dependency-free PNG writer for the bench |
 
 ## Reproducing
@@ -25,6 +26,10 @@ Use scratch directories outside the repository (`<scratch>` below). The probes
 use the meshes shipped in Painter's own `automated_tests` resources under
 neutral names (`body_udim`: one Texture Set with four UV Tiles; `clothing_2ts`:
 two Texture Sets) and an export preset installed in Painter, selected by name.
+The scenarios `export` and `heavy` need `preset_name`: any installed project
+export preset whose outputs are Albedo, ARM and Normal PNGs named like
+`T_$textureSet_Albedo(_$udim)`; the measured runs used a private preset that
+is not part of this repository, so other presets give other file counts.
 
 ```bash
 "<Painter11>/Adobe Substance 3D Painter.exe" --enable-remote-scripting
@@ -34,23 +39,29 @@ python prototypes/m0/run_painter_scenario.py export --scratch <scratch>/painter
 python prototypes/m0/run_painter_scenario.py heavy --scratch <scratch>/painter
 ```
 
-The `export` and `heavy` scenarios take the preset name as `preset_name`
-(`--kw "{\"preset_name\": \"<name>\"}"`).
+Pass the preset as `--kw "{\"preset_name\": \"<name>\"}"` for `export` and
+`heavy`; they stop with a lookup error when it is missing.
 
 Route A in the official Unreal Editor:
 
 ```bash
+python prototypes/m0/ue_make_sources.py <scratch>/ue_src
 python prototypes/m0/ue_make_project.py <scratch>/ue_project <scratch>/ue_src
 python prototypes/m0/ue_publish_bench.py --plan default --source <scratch>/ue_src --log <scratch>/ue_probe.jsonl --commands <scratch>/ue_cmd --out <scratch>/bench.jsonl --uproject <scratch>/ue_project/StoUProbe.uproject --ue-exe "<UE5.7>/Engine/Binaries/Win64/UnrealEditor.exe"
 ```
 
-`<scratch>/ue_src` must first hold the final-named source images; the first
-editor start imports them into `/Game/StoU`. The bench restarts the editor for
-each configuration and never takes keyboard focus except during editor start.
+The first editor start imports the images of `<scratch>/ue_src` into `/Game/StoU`.
+The bench starts `ue_probe.py` itself, restarts the editor for each
+configuration and never takes keyboard focus except during editor start.
+`--plan offline` runs the UE-closed scenario (changes while the editor is
+closed, with Detect Changes On Startup on and off) and `--plan quick` a short
+smoke series.
 
-End to end (UE probe running, Painter with remote scripting): write a live
-configuration from `example_live_config.json` whose `target_dir` is the
-monitored directory, then
+End to end: keep one configured editor running with `ue_publish_bench.py --plan
+serve` (same arguments as above; it runs until `<commands>/stop_serve` exists),
+start Painter with remote scripting, write a live configuration from
+`example_live_config.json` whose `target_dir` is the monitored directory
+(`<scratch>/ue_src`), then
 
 ```bash
 python prototypes/m0/run_painter_scenario.py live --scratch <scratch>/painter --kw "{\"config\": \"<scratch>/live.json\"}"
@@ -58,3 +69,9 @@ python prototypes/m0/run_painter_scenario.py live --scratch <scratch>/painter --
 
 For manual painting tests, run `painter_live_loop.start("<config>")` from
 Painter's Python console and paint; each batch is a JSON line in the configured log.
+
+## Evidence summary
+
+`docs/history/m0-host-validation-data.json` is a hand-made summary of the probe
+logs of the measured runs. The raw logs were not kept and no script rebuilds
+the summary from new logs, so a new run is compared with it by hand.

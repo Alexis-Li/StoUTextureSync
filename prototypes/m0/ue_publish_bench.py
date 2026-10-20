@@ -7,7 +7,8 @@ Each trial publishes new content for a set of source images and waits for the
 matching OnAssetReimport records. It reports per-trial first/last reimport
 latency from the last file replacement, missing or duplicate imports, whether
 the recorded source MD5 equals the published file, and the foreground window
-before and after (to detect focus theft).
+before and after (to detect focus theft): `ue_foreground_before` is UE already in front
+when the trial starts, `ue_became_foreground` is UE in front afterwards but not before.
 """
 
 from __future__ import annotations
@@ -210,7 +211,8 @@ def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage
         "md5_match": None if not md5_match else
         ("all" if all(md5_match.values()) else
          "unknown" if all(v is None for v in md5_match.values()) else md5_match),
-        "ue_foreground_during": fg_before == UE or fg_after == UE,
+        "ue_foreground_before": fg_before == UE,
+        "ue_became_foreground": fg_before != UE and fg_after == UE,
         "foreground_before": fg_before, "foreground_after": fg_after,
         "errors": [r for r in records if r["kind"] not in ("reimport", "post_import", "command")][:5],
         "settings_kept": sorted({(r.get("srgb"), r.get("compression_settings")) for r in reimports}),
@@ -304,7 +306,7 @@ def offline_plan(args, log, editor, names):
         time.sleep(8)
         recorded, report = _report(args, log)
         state = {n: ("offline" if recorded.get(n) == md5_offline[n] else
-                     "online_unsaved" if recorded.get(n) == md5_online[n] else "older")
+                     "online_content" if recorded.get(n) == md5_online[n] else "older")
                  for n in target}
         # Full sync: republish byte-identical content (dedup bypassed).
         log.skip_to_end()
