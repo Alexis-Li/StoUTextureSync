@@ -11,3 +11,5 @@ jobs:
       - run: python tools/validate_project.py
       - run: python -m compileall -q plugins
       - run: python -m unittest discover -s prototypes/m0/tests
+      - run: python -m unittest discover -s tests
+      - run: python tools/package_sp.py --out dist
