@@ -100,12 +100,25 @@ samples and the plug-in itself belongs to
    until a full sync republished the files; UE reimports a republished file only
    when its content differs from what UE imported (changes are detected by file
    hash), which is the recovery FR-03.7 needs.
+10. **A background reimport did not take the foreground from Painter.** Retest
+    on an idle machine (2026-10-21) with Painter brought to the front before
+    each trial and the foreground process sampled every 50 ms from publication
+    to the end of the trial: with UE visible behind Painter or minimized,
+    Painter stayed in front at every sample in all 30 trials (three 1K files
+    n=10 and twelve 1K files n=5 per state); UE never appeared. In the
+    UE-foreground control (n=15) UE stayed in front. Latency did not depend on
+    the state: three files 1.49 / 1.56 / 1.61 s and twelve files 2.79 / 2.72 /
+    2.78 s (median; visible background / minimized / foreground). During one
+    end-to-end live run (114 s, 12 batches, 33 published files and 33 distinct
+    reimports, threshold 1.0 s) the foreground never left Painter. Scripted
+    edits only: a reimport during a pen stroke or with a Painter dialog open was
+    not exercised.
 
 ## DEC-01
 
 Route A (file publication + UE Auto Reimport) with the configuration in item 2;
 POC-06 (directed reimport) not triggered because no core blocker was found.
-The focus condition of PoC-01 is not yet met (see the limits). Starting
+The focus condition of PoC-01 is met for scripted runs (item 10). Starting
 parameters: event throttle 500 ms during real-time sync, 1.0 s idle wait, UE
 threshold 1.0 s (0.3 s was also measured; 0.5 s was not), 1K default.
 Route A's limits stay as documented: the panel can report "file published",
@@ -116,16 +129,11 @@ not "UE complete"; UE association checks remain the user's.
 - Synthetic samples and scripted edits only: no production clothing or body
   projects, no hand painting, no comparison with a manual SP export, no
   distinguishable Tile content.
-- Focus: in 4 of 38 atomic trials UE was the foreground process before or after
-  the trial while the user was working in other applications. All four were with
-  UE visible in the background (4 of 28 such trials; 0 of 10 minimized trials;
-  2 of 5 in the 0.3 s three-file series). The recorded flag does not say
-  whether UE was already in front before the trial, so these runs show no
-  cause and no focus change by the reimport. There
-  was no UE-foreground series and the end-to-end runs did not record focus. The
-  retest, on an idle machine, publishes in each state (UE foreground, visible
-  background, minimized) and records the foreground process before and after
-  every trial with `ue_foreground_before` and `ue_became_foreground`.
+- Focus: in the first runs UE was the foreground process before or after 4 of
+  38 atomic trials while the user was working in other applications, which
+  could not be attributed; the idle-machine retest (item 10) replaces them.
+  The retest used scripted edits and one end-to-end run; focus during tablet
+  painting is part of M1 AC-07.
 - Not measured: resource baseline with both hosts open, viewport visibility,
   baking and material-parameter events, host failure injection, the 12-file or
   2K end-to-end time, the real-time switch during export or publication
@@ -145,7 +153,9 @@ not "UE complete"; UE association checks remain the user's.
   MD5s 2 ms apart) that were not kept. Later changes to the prototype split the
   foreground field into `ue_foreground_before` and `ue_became_foreground` with a
   new rule, rename `online_unsaved` to `online_content`, require `preset_name`
-  and add `ue_make_sources.py`.
+  and add `ue_make_sources.py`. The focus retest used the `focus` and
+  `serve --focus-log` plans of `ue_publish_bench.py` at
+  `eafc3dd4024f362d94448b5a1e71196300578f96`.
 - Hosts: Painter 11.0.0 (Python 3.11.6); Unreal Editor 5.7.4-51494982
   official build. Windows 11 Pro, 32 GB RAM, RTX 4060; both hosts open; the
   user was using other applications during the UE runs.
@@ -155,4 +165,6 @@ not "UE complete"; UE association checks remain the user's.
   materials for the heavy case; an installed project preset (not part of the
   repository); UE source images were near-solid generated PNGs; `ue_make_sources.py`
   reproduces a comparable set.
-- Run date: 2026-10-19.
+- Run dates: 2026-10-19; focus retest 2026-10-21 on the same hosts and machine
+  with nobody using it, Painter open with an empty session (the live run
+  creates its own project).

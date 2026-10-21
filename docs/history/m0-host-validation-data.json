@@ -1005,5 +1005,87 @@
  },
  "export_light_notes": {
   "distinct_sha": "distinct_sha 3 over 12 files means the four Tiles of each output carry identical content in this sample, so file content cannot show a Tile mix-up."
+ },
+ "focus_retest": {
+  "date": "2026-10-21",
+  "tool": "prototypes/m0/ue_publish_bench.py --plan focus --reps 10 at eafc3dd4024f362d94448b5a1e71196300578f96",
+  "conditions": "idle machine; Painter 11.0.0 brought to front before each holder trial; UE 5.7.4 threshold 1.0 s, Use Less CPU when in Background on; 1K near-solid sources; foreground sampled every 50 ms from publication to trial end",
+  "series": {
+   "part3_ue_background": {
+    "n": 10,
+    "files": 3,
+    "holder_front_before": 10,
+    "ue_became_foreground": 0,
+    "ue_foreground_seen": 0,
+    "median_last_s": 1.49,
+    "max_last_s": 1.7,
+    "complete": 10,
+    "md5_all": 10
+   },
+   "part3_ue_minimized": {
+    "n": 10,
+    "files": 3,
+    "holder_front_before": 10,
+    "ue_became_foreground": 0,
+    "ue_foreground_seen": 0,
+    "median_last_s": 1.561,
+    "max_last_s": 1.682,
+    "complete": 10,
+    "md5_all": 10
+   },
+   "part3_ue_foreground": {
+    "n": 10,
+    "files": 3,
+    "ue_foreground_before": 10,
+    "foreground_changed": 0,
+    "median_last_s": 1.606,
+    "max_last_s": 1.681,
+    "complete": 10,
+    "md5_all": 10
+   },
+   "all12_ue_background": {
+    "n": 5,
+    "files": 12,
+    "holder_front_before": 5,
+    "ue_became_foreground": 0,
+    "ue_foreground_seen": 0,
+    "median_last_s": 2.794,
+    "max_last_s": 2.879,
+    "complete": 5,
+    "md5_all": 5
+   },
+   "all12_ue_minimized": {
+    "n": 5,
+    "files": 12,
+    "holder_front_before": 5,
+    "ue_became_foreground": 0,
+    "ue_foreground_seen": 0,
+    "median_last_s": 2.721,
+    "max_last_s": 2.749,
+    "complete": 5,
+    "md5_all": 5
+   },
+   "all12_ue_foreground": {
+    "n": 5,
+    "files": 12,
+    "ue_foreground_before": 5,
+    "foreground_changed": 0,
+    "median_last_s": 2.782,
+    "max_last_s": 2.848,
+    "complete": 5,
+    "md5_all": 5
+   }
+  },
+  "end_to_end_live": {
+   "tool": "ue_publish_bench.py --plan serve --focus-log plus run_painter_scenario.py live",
+   "duration_s": 114.6,
+   "batches": 12,
+   "published_files": 33,
+   "distinct_reimports": 33,
+   "foreground_changes_during_run": 0,
+   "foreground_throughout": "Adobe Substance 3D Painter.exe",
+   "note": "batches: one full sync (12 files), five one-Tile edits (1 file), five all-Tile edits (3 files), one manual sync after switching real-time off"
+  },
+  "not_covered": "pen strokes during a reimport, open Painter dialogs, production scenes"
  }
 }
