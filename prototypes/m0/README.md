@@ -53,6 +53,11 @@ python prototypes/m0/ue_publish_bench.py --plan default --source <scratch>/ue_sr
 The first editor start imports the images of `<scratch>/ue_src` into `/Game/StoU`.
 The bench starts `ue_probe.py` itself, restarts the editor for each
 configuration and never takes keyboard focus except during editor start.
+`--plan focus` (Painter running) brings Painter to the front before each trial,
+publishes with UE visible behind it, minimized, or in front as a control, and
+samples the foreground process every 50 ms; it takes focus by design, so run it
+on an idle machine. `--plan serve --focus-log <file>` records every foreground
+change while an end-to-end run is active.
 `--plan offline` runs the UE-closed scenario (changes while the editor is
 closed, with Detect Changes On Startup on and off) and `--plan quick` a short
 smoke series.

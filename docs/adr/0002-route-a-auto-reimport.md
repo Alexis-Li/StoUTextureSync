@@ -13,8 +13,9 @@ recovered offline changes (observed on synthetic samples, one to three changed
 1K files end to end in 3.0–4.0 s, event throttle 500 ms, idle wait 1.0 s,
 threshold 1.0 s). A change of all twelve files, 2K output and production scenes
 were not measured; twelve files alone take 2.8 s in UE, so the five-second
-target is not shown for them. Focus behaviour after a reimport is not settled
-(see the M0 record). No UE component is built for M1 (UE-02 and POC-06 are not
+target is not shown for them. In an idle-machine retest a background reimport
+never took the foreground from Painter (UE visible behind it or minimized, and
+one end-to-end run); tablet painting is checked in M1. No UE component is built for M1 (UE-02 and POC-06 are not
 needed).
 
 Required UE configuration, documented for users in M1 (UE-01):
