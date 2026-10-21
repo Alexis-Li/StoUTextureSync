@@ -1,14 +1,16 @@
-"""Measure route A: publish source images and time UE Auto Reimport (needs ue_probe.py running).
+"""Measure route A: publish source images and time UE Auto Reimport (starts the editor with ue_probe.py).
 
 Usage: python ue_publish_bench.py --source <dir> --log <ue_probe.jsonl> --commands <dir>
-           [--plan default|quick] [--out results.jsonl]
+           --uproject <StoUProbe.uproject> --ue-exe <UnrealEditor.exe> --out <results.jsonl>
+           [--plan default|quick|serve|offline]
 
 Each trial publishes new content for a set of source images and waits for the
 matching OnAssetReimport records. It reports per-trial first/last reimport
 latency from the last file replacement, missing or duplicate imports, whether
 the recorded source MD5 equals the published file, and the foreground window
-before and after (to detect focus theft): `ue_foreground_before` is UE already in front
-when the trial starts, `ue_became_foreground` is UE in front afterwards but not before.
+before and after (to detect focus theft): `ue_foreground_before` is UE already in
+front when the trial starts, `ue_became_foreground` is UE in front afterwards but
+not before.
 """
 
 from __future__ import annotations

@@ -18,9 +18,10 @@ samples and the plug-in itself belongs to
 1. **Route A closes the loop in the official editor.** Per-file atomic
    replacement (temporary file beside the target, then `os.replace`) of a source
    image that an existing Texture was imported from triggers Auto Reimport. In
-   the 176 atomic reimports of the series in the JSON (about 20 more in the
-   end-to-end runs) the source MD5 recorded by UE equalled the MD5 of the
-   complete published file. Observed in the logs: every non-default texture
+   the 176 atomic reimports of the series in the JSON the source MD5 recorded by
+   UE equalled the MD5 of the complete published file. The end-to-end runs add
+   21 published-file reimports (5 x 1 file, 5 x 3 files, 1 manual sync) for
+   which the JSON holds no MD5 field. Observed in the logs: every non-default texture
    setting (sRGB, compression, LOD group, mip generation) and the material
    instance's texture reference stayed, no asset was created, and Auto Reimport
    saved the reimported packages (no dirty package before a normal quit, one run
@@ -56,7 +57,7 @@ samples and the plug-in itself belongs to
    carries `stack_id` and 0-based `(u, v)` `tile_indices`, which use the same
    coordinates as the `uvTiles` export filter (the two were matched by
    coordinate, not in one batch); a fill restricted to one Tile reported only
-   that Tile (one edit, one run). `ADD` and `REMOVE` arrive within
+   that Tile (one edit; one run per throttle setting). `ADD` and `REMOVE` arrive within
    milliseconds, `UPDATE` after the cache-key throttle (default 2000 ms,
    settable to the 500 ms minimum; the setting is global and must be restored
    on close). `REMOVE` (texture became empty, for example a black mask) is also
@@ -81,7 +82,9 @@ samples and the plug-in itself belongs to
 7. **Qt timers kept running during export.** A 10 ms Qt heartbeat saw median
    gaps of 32.6–61.7 ms and maximum gaps of 37.4 / 38.6 / 349.0 / 80.2 ms for
    the heavy stack at 1K full / 1K one Tile / 2K full / 2K one Tile, while
-   exports took 0.38–2.5 s (median; the 2K heavy maximum was 4.07 s). No
+   light-case exports took 0.38–1.95 s (single runs; the five 1K repeats had a
+   median of 0.52 s) and heavy-stack medians were 0.43–2.53 s (the 2K heavy
+   maximum was 4.07 s). No
    light-case stall or idle baseline was kept, and event callbacks were not
    observed directly. Whether painting with a tablet is interrupted still needs
    a person.
@@ -113,11 +116,12 @@ not "UE complete"; UE association checks remain the user's.
 - Synthetic samples and scripted edits only: no production clothing or body
   projects, no hand painting, no comparison with a manual SP export, no
   distinguishable Tile content.
-- Focus: in 4 of 38 atomic trials UE was the foreground process after a
-  reimport while the user was working in other applications. All four were with
+- Focus: in 4 of 38 atomic trials UE was the foreground process before or after
+  the trial while the user was working in other applications. All four were with
   UE visible in the background (4 of 28 such trials; 0 of 10 minimized trials;
-  2 of 5 in the 0.3 s three-file series). The recorded flag also counts UE
-  already being in front before the trial, so these runs show no cause. There
+  2 of 5 in the 0.3 s three-file series). The recorded flag does not say
+  whether UE was already in front before the trial, so these runs show no
+  cause and no focus change by the reimport. There
   was no UE-foreground series and the end-to-end runs did not record focus. The
   retest, on an idle machine, publishes in each state (UE foreground, visible
   background, minimized) and records the foreground process before and after
@@ -133,9 +137,15 @@ not "UE complete"; UE association checks remain the user's.
 
 ## Baseline
 
-- Tools: `prototypes/m0/` at `6288e96385ff1a343ed1dd44ba1643d82dfbb571`; later
-  changes to the prototype only rename report fields, add `ue_make_sources.py`
-  and require `preset_name`.
+- Tools: `prototypes/m0/` first committed as
+  `6288e96385ff1a343ed1dd44ba1643d82dfbb571`. The `ue_publish_bench.py` used
+  for the measurements predates the de-duplication fix that collapses UE's
+  double `OnAssetReimport` broadcast; two series had counted it as a duplicate
+  import and their summary values were corrected by hand from raw logs (identical
+  MD5s 2 ms apart) that were not kept. Later changes to the prototype split the
+  foreground field into `ue_foreground_before` and `ue_became_foreground` with a
+  new rule, rename `online_unsaved` to `online_content`, require `preset_name`
+  and add `ue_make_sources.py`.
 - Hosts: Painter 11.0.0 (Python 3.11.6); Unreal Editor 5.7.4-51494982
   official build. Windows 11 Pro, 32 GB RAM, RTX 4060; both hosts open; the
   user was using other applications during the UE runs.
@@ -143,6 +153,6 @@ not "UE complete"; UE association checks remain the user's.
   (one Texture Set, Tiles 1001/1002/1011/1012 mapped to Face/Body/Arm/Leg) and
   `clothing_2ts` (two Texture Sets); a 38-node stack of eight starter smart
   materials for the heavy case; an installed project preset (not part of the
-  repository); UE source images generated as near-solid PNGs
-  (`ue_make_sources.py`) for the reimport bench.
+  repository); UE source images were near-solid generated PNGs; `ue_make_sources.py`
+  reproduces a comparable set.
 - Run date: 2026-10-19.

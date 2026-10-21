@@ -982,9 +982,10 @@
   }
  ],
  "ue_auto_reimport_notes": {
-  "foreground_trials": "Trials in which UE was the foreground process before or after the trial (bench rule: foreground_before or foreground_after is UE). It does not show that the reimport moved UE to the front; the user was working in other applications during these runs.",
-  "reimport_totals": "n x files: 176 atomic reimports in the series above plus 2 slow direct writes; the end-to-end series adds 20 (5 single-Tile x 1 file, 5 all-Tile x 3 files).",
-  "dedup": "UE broadcasts OnAssetReimport twice per import; the bench merges records with the same (asset, MD5), which would also merge a genuine repeat import of identical content."
+  "foreground_trials": "Trials in which UE was the foreground process before or after the trial (rule at measurement: foreground_before or foreground_after is UE). It does not show that the reimport moved UE to the front; the user was working in other applications during these runs.",
+  "reimport_totals": "n x files: 176 atomic reimports in the series above plus 2 slow direct writes; the end-to-end series adds 21 (5 single-Tile x 1 file, 5 all-Tile x 3 files, 1 manual sync after the switch-off) and has no MD5 field.",
+  "dedup": "UE broadcasts OnAssetReimport twice per import; the bench merges records with the same (asset, MD5), which would also merge a genuine repeat import of identical content.",
+  "measurement_tool": "The bench used for these series predates the fix that merges UE's double OnAssetReimport broadcast; two series that had counted it as a duplicate import were corrected by hand from raw logs that were not kept."
  },
  "ue_offline_notes": {
   "online_content": "UE's recorded source MD5 after restart equals the content published while UE was online (the offline change was not picked up); 'offline' means it equals the content published while UE was closed.",
