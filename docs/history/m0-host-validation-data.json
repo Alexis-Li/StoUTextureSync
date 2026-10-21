@@ -1086,6 +1086,7 @@
    "foreground_throughout": "Adobe Substance 3D Painter.exe",
    "note": "batches: one full sync (12 files), five one-Tile edits (1 file), five all-Tile edits (3 files), one manual sync after switching real-time off"
   },
-  "not_covered": "pen strokes during a reimport, open Painter dialogs, production scenes"
+  "not_covered": "pen strokes during a reimport, open Painter dialogs, production scenes",
+  "log_labels": "series keys map to the bench labels focus_<part3|all12>_<bg|min|uefront>; foreground_changed is the bench's focus_changed (foreground_before differs from foreground_after)"
  }
 }

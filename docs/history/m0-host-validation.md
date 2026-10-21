@@ -109,7 +109,7 @@ samples and the plug-in itself belongs to
     UE-foreground control (n=15) UE stayed in front. Latency did not depend on
     the state: three files 1.49 / 1.56 / 1.61 s and twelve files 2.79 / 2.72 /
     2.78 s (median; visible background / minimized / foreground). During one
-    end-to-end live run (114 s, 12 batches, 33 published files and 33 distinct
+    end-to-end live run (114.6 s, 12 batches, 33 published files and 33 distinct
     reimports, threshold 1.0 s) the foreground never left Painter. Scripted
     edits only: a reimport during a pen stroke or with a Painter dialog open was
     not exercised.

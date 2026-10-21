@@ -216,32 +216,34 @@ def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage
     log.skip_to_end()
     fg_before = foreground_process()
     sampler = FocusSampler().start()
-    start = time.time()
-    if mode == "atomic":
-        for name in names:
-            publish_file(staged[name], os.path.join(args.source, name))
-    elif mode == "direct_slow":
-        # A writer that pauses mid-file longer than the import threshold.
-        for name in names:
-            with open(staged[name], "rb") as handle:
-                data = handle.read()
-            with open(os.path.join(args.source, name), "wb") as handle:
-                handle.write(data[: len(data) // 2])
-                handle.flush()
-                time.sleep(args.slow_pause)
-                handle.write(data[len(data) // 2:])
-    published = time.time()
-    assets = {os.path.splitext(n)[0] for n in names}
+    try:
+        start = time.time()
+        if mode == "atomic":
+            for name in names:
+                publish_file(staged[name], os.path.join(args.source, name))
+        elif mode == "direct_slow":
+            # A writer that pauses mid-file longer than the import threshold.
+            for name in names:
+                with open(staged[name], "rb") as handle:
+                    data = handle.read()
+                with open(os.path.join(args.source, name), "wb") as handle:
+                    handle.write(data[: len(data) // 2])
+                    handle.flush()
+                    time.sleep(args.slow_pause)
+                    handle.write(data[len(data) // 2:])
+        published = time.time()
+        assets = {os.path.splitext(n)[0] for n in names}
 
-    def complete(records):
-        done = {r["asset"] for r in records if r["kind"] == "reimport"}
-        return assets <= done
+        def complete(records):
+            done = {r["asset"] for r in records if r["kind"] == "reimport"}
+            return assets <= done
 
-    records = wait_for(log, complete, timeout)
-    time.sleep(1.0)
-    records.extend(log.read_new())
-    fg_after = foreground_process()
-    sampler.stop()
+        records = wait_for(log, complete, timeout)
+        time.sleep(1.0)
+        records.extend(log.read_new())
+        fg_after = foreground_process()
+    finally:
+        sampler.stop()
     # UE 5.7 broadcasts OnAssetReimport twice per texture import; count distinct imports.
     unique = {}
     for r in records:
@@ -436,11 +438,14 @@ def main() -> int:
         editor.start(threshold=args.threshold, throttle=not args.no_throttle)
         sampler = FocusSampler(args.focus_log).start() if args.focus_log else None
         stop_file = os.path.join(args.commands, "stop_serve")
-        while not os.path.exists(stop_file):
-            time.sleep(1)
-        os.remove(stop_file)
+        try:
+            while not os.path.exists(stop_file):
+                time.sleep(1)
+            os.remove(stop_file)
+        finally:
+            if sampler:
+                sampler.stop()
         if sampler:
-            sampler.stop()
             print("FOCUS", json.dumps({"samples": sampler.samples, "seen": sampler.seen,
                                        "changes": len(sampler.changes)}))
         editor.stop()
