@@ -230,6 +230,8 @@ def describe_project(runner):
 
 
 def preset_url(name):
+    if not name:
+        raise LookupError("pass preset_name: the display name of an installed project export preset")
     for preset in sp.export.list_resource_export_presets():
         if preset.resource_id.name == name:
             return preset.resource_id.url()
@@ -448,7 +450,7 @@ def scenario_events(runner, throttle_ms=None):
     runner.log("summary_sets", sets=sets, throttle_restored_ms=previous.total_seconds() * 1000)
 
 
-def scenario_export(runner, preset_name="兔皮鸭套装输出"):
+def scenario_export(runner, preset_name=None):
     """POC-02/03/04: preset outputs, uvTiles filter, size, timing, stall and hash stability."""
     stage_root = os.path.join(runner.scratch, "export")
     shutil.rmtree(stage_root, ignore_errors=True)
@@ -530,7 +532,7 @@ def scenario_export(runner, preset_name="兔皮鸭套装输出"):
                                export_config(stage("clothing_stall"), preset, roots))
 
 
-def scenario_heavy(runner, preset_name="兔皮鸭套装输出", smart_materials=8, reps=7):
+def scenario_heavy(runner, preset_name=None, smart_materials=8, reps=7):
     """POC-04: export timing and stall for a heavier procedural stack on the UDIM sample."""
     stage_root = os.path.join(runner.scratch, "heavy")
     shutil.rmtree(stage_root, ignore_errors=True)

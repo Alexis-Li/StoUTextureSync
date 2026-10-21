@@ -9,8 +9,13 @@ Painter publishes each validated output by writing a temporary file beside the
 target and atomically replacing it; the official Unreal Editor 5.7.4 updates the
 existing Texture through Auto Reimport. In M0 this reimported only complete
 files, kept texture settings and material references, saved the packages and
-recovered offline changes, with latency well inside the five-second target on
-light content. No UE component is built for M1 (UE-02 and POC-06 are not needed).
+recovered offline changes (observed on synthetic samples, one to three changed
+1K files end to end in 3.0–4.0 s, event throttle 500 ms, idle wait 1.0 s,
+threshold 1.0 s). A change of all twelve files, 2K output and production scenes
+were not measured; twelve files alone take 2.8 s in UE, so the five-second
+target is not shown for them. Focus behaviour after a reimport is not settled
+(see the M0 record). No UE component is built for M1 (UE-02 and POC-06 are not
+needed).
 
 Required UE configuration, documented for users in M1 (UE-01):
 
@@ -22,8 +27,9 @@ Required UE configuration, documented for users in M1 (UE-01):
 
 Starting parameters: `TextureStateEvent` throttle 500 ms while real-time sync is
 active (global, restored on close), 1.0 s idle wait, UE Import Threshold 1.0 s
-(0.3–0.5 s if the budget needs it), 1K output by default. Background CPU
-throttling showed no effect and needs no setting.
+(0.3 s was also measured, three files in 0.97 s; lower values are untested), 1K
+output by default. Background CPU throttling did not change latency in M0 and
+needs no setting.
 
 Consequences: the panel reports "file published", never "UE complete"; source
 association checks in UE stay with the user; a full sync is the recovery path

@@ -3,7 +3,9 @@
 Source: [M0 issue #2](https://github.com/Alexis-Li/StoUTextureSync/issues/2),
 requirements in [#1](https://github.com/Alexis-Li/StoUTextureSync/issues/1).
 Tools: [prototypes/m0](../../prototypes/m0/README.md). Measurements:
-[m0-host-validation-data.json](m0-host-validation-data.json).
+[m0-host-validation-data.json](m0-host-validation-data.json), a hand-made
+summary of probe logs that were not kept; statements marked "observed" below
+come from those logs and cannot be recomputed from the JSON.
 
 State: Painter 11.0 and the official Unreal Editor 5.7.4 were exercised by
 scripted probes on synthetic samples. `DEC-01` selects route A
@@ -16,93 +18,141 @@ samples and the plug-in itself belongs to
 1. **Route A closes the loop in the official editor.** Per-file atomic
    replacement (temporary file beside the target, then `os.replace`) of a source
    image that an existing Texture was imported from triggers Auto Reimport. In
-   225 reimports UE always recorded the MD5 of the complete published file, kept
-   every non-default texture setting (sRGB, compression, LOD group, mip
-   generation), kept the material instance's texture reference and created no
-   assets. Auto Reimport saves the reimported packages itself, so restarting UE
-   does not lose results.
+   the 176 atomic reimports of the series in the JSON the source MD5 recorded by
+   UE equalled the MD5 of the complete published file. The end-to-end runs add
+   21 published-file reimports (5 x 1 file, 5 x 3 files, 1 manual sync) for
+   which the JSON holds no MD5 field. Observed in the logs: every non-default texture
+   setting (sRGB, compression, LOD group, mip generation) and the material
+   instance's texture reference stayed, no asset was created, and Auto Reimport
+   saved the reimported packages (no dirty package before a normal quit, one run
+   per setting). The per-trial counts of these observations were not kept.
 2. **Required UE configuration** (UE 5.7.4): `Monitor Content Directories` on;
    the source directory listed by absolute path *with a mount point* (an
    unmapped absolute path is refused with "not associated with mounted path");
    include wildcard `*.png`; `Auto Create Assets` and `Auto Delete Assets` off;
    `Prompt Before Action` off (default on, which waits for a click). A mount
-   point is only used for creation, which stays off.
-3. **Background and CPU throttling do not change reimport latency.** With
-   threshold 1.0 s, three 1K files finished 1.59–1.62 s (median) after
-   publication whether UE was visible in the background or minimized and with
-   `Use Less CPU when in Background` on or off. Twelve files: 2.83 s at 1K,
-   3.13 s at 2K. Threshold 0.3 s: three files 0.97 s, one file 0.33 s.
-4. **End to end under five seconds on light content.** Scripted edits through
-   the live loop prototype (500 ms event throttle, 1.0 s idle wait, threshold
-   1.0 s) reached the last UE reimport in 3.03 s median for a one-Tile edit and
-   3.94 s for an all-Tile edit (n=5 each, max 3.98 s). Roughly: event 0.5 s,
-   idle wait 1.0 s, export 0.45–0.7 s, publication < 0.03 s, UE 1.0–1.7 s.
-   Viewport visibility after the reimport callback was not measured.
+   point is only used for creation, which stays off. Observed, not in the JSON.
+3. **Background and CPU throttling did not change reimport latency in these
+   runs.** With threshold 1.0 s, three 1K files finished 1.59–1.62 s (median,
+   n=5 per series) after publication whether UE was visible in the background
+   or minimized and with `Use Less CPU when in Background` on or off; UE in the
+   foreground was not a series. Twelve 1K files: 2.83 s (n=5); twelve 2K files:
+   3.13 s (n=3). Threshold 0.3 s: three files 0.97 s, one file 0.33 s (n=5
+   each). The sources are near-solid PNGs in an empty project, so decode and
+   compression cost of real textures is not represented. A slow direct writer
+   (one file, written in two halves 2.5 s apart, n=2) was imported only after
+   the write finished, with the complete file's MD5.
+4. **End to end under five seconds for one to three changed 1K files on light
+   content.** Scripted edits through the live loop prototype (500 ms event
+   throttle, 1.0 s idle wait, threshold 1.0 s) reached the last UE reimport in
+   3.03 s median for a one-Tile edit (1 file published) and 3.94 s for an
+   all-Tile edit (3 files published of 12 exported; n=5 each, max 3.98 s).
+   Roughly: event 0.5 s, idle wait 1.0 s, export 0.45–0.7 s, publication and
+   scheduling about 0.05 s, UE 1.0–1.7 s. A change of all 12 files was not run
+   end to end; the 12-file UE series (2.83 s) with the same SP side (about
+   2.25 s) would exceed five seconds. 2K and heavy-stack end-to-end runs were
+   not done, and viewport visibility after the reimport callback was not
+   measured.
 5. **Painter events identify Texture Set and Tile.** `TextureStateEvent`
-   carries `stack_id` and 0-based `(u, v)` `tile_indices`, which equal the
-   `uvTiles` export filter coordinates; a fill restricted to one Tile reports
-   only that Tile. `ADD` and `REMOVE` arrive within milliseconds, `UPDATE`
-   after the cache-key throttle (default 2000 ms, settable to the 500 ms
-   minimum; the setting is global and must be restored on close). `REMOVE`
-   (texture became empty, for example a black mask) is also a content change.
-   Hiding an already-empty layer produced no event.
+   carries `stack_id` and 0-based `(u, v)` `tile_indices`, which use the same
+   coordinates as the `uvTiles` export filter (the two were matched by
+   coordinate, not in one batch); a fill restricted to one Tile reported only
+   that Tile (one edit; one run per throttle setting). `ADD` and `REMOVE` arrive within
+   milliseconds, `UPDATE` after the cache-key throttle (default 2000 ms,
+   settable to the 500 ms minimum; the setting is global and must be restored
+   on close). `REMOVE` (texture became empty, for example a black mask) is also
+   a content change. Three edits produced no event at all: hiding a layer,
+   inserting an empty paint layer and showing only the roughness channel of a
+   layer. Whether they changed the export was not recorded, so event coverage of
+   layer and channel visibility is unverified.
 6. **Export behaviour.** `uvTiles: [[u, v]]` limits export to those Tiles
    (non-existent Tiles give an empty list; UDIM numbers are rejected). The
-   project preset loads by name; its outputs are Albedo (RGB base colour,
-   A opacity), ARM (R AO_Mixed, G roughness, B metallic), Normal (DirectX) and
-   Emissive, 8-bit PNG. `list_project_textures()` predicts outputs that the
-   export does not write when a channel is absent (Emissive), so validation
-   compares against the actual result and treats missing optional outputs
-   separately. Repeated exports of unchanged content are byte-identical, so
+   project preset used here planned Albedo, ARM, Normal and Emissive PNGs;
+   `list_project_textures()` predicts Emissive, which the export does not write
+   when the channel is absent, so validation compares against the actual result
+   and treats missing optional outputs separately. Repeated exports of
+   unchanged content were byte-identical (one boolean in the JSON), so
    target-content dedup works; in the live loop it skipped every unchanged map.
-   An unknown Texture Set raises before anything is written. Chinese staging and
-   project paths worked. Messages are localized; do not parse them.
-7. **Export does not freeze Painter's event loop.** A 10 ms Qt heartbeat saw
-   maximum gaps of 30–60 ms while exports took 0.45–2.5 s (one 349 ms gap in a
-   2K run), so Qt events are processed during export. Whether painting with a
-   tablet is interrupted still needs a person.
+   An unknown Texture Set raised before anything was written (observed). Chinese
+   staging paths worked. Messages are localized; do not parse them. Not
+   verified from this data: bit depth, colour space, Alpha, ARM channel order
+   and DirectX normal convention (the JSON holds no pixel values). The four
+   Tiles of each output carry identical content in the sample (3 distinct hashes
+   over 12 files), so a Tile mix-up would not show in file content.
+7. **Qt timers kept running during export.** A 10 ms Qt heartbeat saw median
+   gaps of 32.6–61.7 ms and maximum gaps of 37.4 / 38.6 / 349.0 / 80.2 ms for
+   the heavy stack at 1K full / 1K one Tile / 2K full / 2K one Tile, while
+   light-case exports took 0.38–1.95 s (single runs; the five 1K repeats had a
+   median of 0.52 s) and heavy-stack medians were 0.43–2.53 s (the 2K heavy
+   maximum was 4.07 s). No
+   light-case stall or idle baseline was kept, and event callbacks were not
+   observed directly. Whether painting with a tablet is interrupted still needs
+   a person.
 8. **Project identity.** `project.get_uuid()` exists in Painter 11.0 and, like
    plug-in Metadata, survives save, reopen, save-as, save-as-copy, OS copy and
-   a move to a Chinese path; a new project gets a new UUID. Copies therefore
-   share identity: bindings need identity *plus* path conflict detection, as
-   FR-06 already requires.
-9. **UE offline.** With `Detect Changes On Startup` on, files changed while UE
-   was closed were reimported within seconds of startup. With it off they were
-   missed until a full sync republished the files; UE reimports a republished
-   file only when its content differs from what UE imported (changes are
-   detected by file hash), which is the recovery FR-03.7 needs.
+   a move to a Chinese path (one run each); a new project gets a new UUID.
+   Copies therefore share identity: bindings need identity *plus* path conflict
+   detection, as FR-06 already requires.
+9. **UE offline.** One run per setting, two files, normal editor quit (no
+   crash). With `Detect Changes On Startup` on, the files changed while UE was
+   closed were reimported within the fixed 8 s observation window after
+   startup (the time was not recorded). With it off the changes were missed
+   until a full sync republished the files; UE reimports a republished file only
+   when its content differs from what UE imported (changes are detected by file
+   hash), which is the recovery FR-03.7 needs.
 
 ## DEC-01
 
 Route A (file publication + UE Auto Reimport) with the configuration in item 2;
 POC-06 (directed reimport) not triggered because no core blocker was found.
-Starting parameters: event throttle 500 ms during real-time sync, 1.0 s idle
-wait, UE threshold 1.0 s (0.3–0.5 s if the budget needs it), 1K default.
+The focus condition of PoC-01 is not yet met (see the limits). Starting
+parameters: event throttle 500 ms during real-time sync, 1.0 s idle wait, UE
+threshold 1.0 s (0.3 s was also measured; 0.5 s was not), 1K default.
 Route A's limits stay as documented: the panel can report "file published",
 not "UE complete"; UE association checks remain the user's.
 
 ## Limits of this evidence
 
 - Synthetic samples and scripted edits only: no production clothing or body
-  projects, no hand painting, no comparison with a manual SP export.
-- Focus: in 4 of 38 trials UE became foreground after a reimport while the user
-  was working in other applications; not attributable from these runs.
+  projects, no hand painting, no comparison with a manual SP export, no
+  distinguishable Tile content.
+- Focus: in 4 of 38 atomic trials UE was the foreground process before or after
+  the trial while the user was working in other applications. All four were with
+  UE visible in the background (4 of 28 such trials; 0 of 10 minimized trials;
+  2 of 5 in the 0.3 s three-file series). The recorded flag does not say
+  whether UE was already in front before the trial, so these runs show no
+  cause and no focus change by the reimport. There
+  was no UE-foreground series and the end-to-end runs did not record focus. The
+  retest, on an idle machine, publishes in each state (UE foreground, visible
+  background, minimized) and records the foreground process before and after
+  every trial with `ue_foreground_before` and `ue_became_foreground`.
 - Not measured: resource baseline with both hosts open, viewport visibility,
-  baking and material-parameter events, host failure injection. Write-lock,
+  baking and material-parameter events, host failure injection, the 12-file or
+  2K end-to-end time, the real-time switch during export or publication
+  (it was switched off 0.2 s after an edit, during the idle wait). Write-lock,
   partial publication and stale-batch logic are covered only by project tests.
+- Duplicate imports: the bench merges UE's double `OnAssetReimport` broadcast
+  by `(asset, MD5)`, which would also merge a genuine repeat of identical
+  content; no per-trial duplicate counts were kept.
 
 ## Baseline
 
-- Tools: the prototype commit named in the PR that added this record;
-  `ue_publish_bench.py` deduplication was corrected afterwards to collapse
-  UE's double `OnAssetReimport` broadcast (two series counted it as a
-  duplicate import; raw logs show identical MD5s 2 ms apart).
+- Tools: `prototypes/m0/` first committed as
+  `6288e96385ff1a343ed1dd44ba1643d82dfbb571`. The `ue_publish_bench.py` used
+  for the measurements predates the de-duplication fix that collapses UE's
+  double `OnAssetReimport` broadcast; two series had counted it as a duplicate
+  import and their summary values were corrected by hand from raw logs (identical
+  MD5s 2 ms apart) that were not kept. Later changes to the prototype split the
+  foreground field into `ue_foreground_before` and `ue_became_foreground` with a
+  new rule, rename `online_unsaved` to `online_content`, require `preset_name`
+  and add `ue_make_sources.py`.
 - Hosts: Painter 11.0.0 (Python 3.11.6); Unreal Editor 5.7.4-51494982
   official build. Windows 11 Pro, 32 GB RAM, RTX 4060; both hosts open; the
   user was using other applications during the UE runs.
 - Samples: Painter's bundled test meshes under neutral names — `body_udim`
   (one Texture Set, Tiles 1001/1002/1011/1012 mapped to Face/Body/Arm/Leg) and
   `clothing_2ts` (two Texture Sets); a 38-node stack of eight starter smart
-  materials for the heavy case; the installed project preset; UE source images
-  generated as solid PNGs for the reimport bench.
+  materials for the heavy case; an installed project preset (not part of the
+  repository); UE source images were near-solid generated PNGs; `ue_make_sources.py`
+  reproduces a comparable set.
 - Run date: 2026-10-19.
