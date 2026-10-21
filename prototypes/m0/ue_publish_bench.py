@@ -2,7 +2,7 @@
 
 Usage: python ue_publish_bench.py --source <dir> --log <ue_probe.jsonl> --commands <dir>
            --uproject <StoUProbe.uproject> --ue-exe <UnrealEditor.exe> --out <results.jsonl>
-           [--plan default|quick|serve|offline]
+           [--plan default|quick|focus|serve|offline] [--focus-log <foreground.jsonl>]
 
 Each trial publishes new content for a set of source images and waits for the
 matching OnAssetReimport records. It reports per-trial first/last reimport
@@ -10,7 +10,10 @@ latency from the last file replacement, missing or duplicate imports, whether
 the recorded source MD5 equals the published file, and the foreground window
 before and after (to detect focus theft): `ue_foreground_before` is UE already in
 front when the trial starts, `ue_became_foreground` is UE in front afterwards but
-not before.
+not before, and `ue_foreground_seen` is UE in front at any 50 ms sample between
+publication and the end of the trial. The `focus` plan holds Painter in front
+before each trial; `serve` with `--focus-log` records every foreground change
+while an end-to-end run is active.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import json
 import os
 import statistics
 import sys
+import threading
 import time
 from ctypes import wintypes
 
@@ -106,6 +110,46 @@ def set_window_state(state: str) -> None:
     time.sleep(1.5)
 
 
+class FocusSampler:
+    """Sample the foreground process every 50 ms in a background thread."""
+
+    def __init__(self, path=None):
+        self.path = path
+        self.samples = 0
+        self.seen = []
+        self.changes = []
+        self._stop = threading.Event()
+        self._thread = None
+
+    def start(self):
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return self
+
+    def _run(self):
+        last = None
+        while not self._stop.is_set():
+            current = foreground_process()
+            self.samples += 1
+            if current not in self.seen:
+                self.seen.append(current)
+            if current != last:
+                change = {"wall": round(time.time(), 3), "foreground": current, "previous": last}
+                self.changes.append(change)
+                if self.path:
+                    with open(self.path, "a", encoding="utf-8") as handle:
+                        handle.write(json.dumps(change, ensure_ascii=False) + "\n")
+                last = current
+            time.sleep(0.05)
+
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(2)
+        return self
+
+
 class ProbeLog:
     def __init__(self, path):
         self.path = path
@@ -152,7 +196,8 @@ def make_content(size):
     return solid_png(size, size, color, noise_seed=seed)
 
 
-def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage_dir=None):
+def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage_dir=None,
+          holder=None):
     stage_dir = stage_dir or os.path.join(os.path.dirname(args.log), "bench_stage")
     os.makedirs(stage_dir, exist_ok=True)
     staged, md5 = {}, {}
@@ -163,8 +208,14 @@ def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage
             handle.write(data)
         staged[name] = path
         md5[name] = hashlib.md5(data).hexdigest()
+    if holder:
+        hwnd = window_of(holder)
+        if hwnd:
+            bring_to_front(hwnd)
+        time.sleep(1.0)
     log.skip_to_end()
     fg_before = foreground_process()
+    sampler = FocusSampler().start()
     start = time.time()
     if mode == "atomic":
         for name in names:
@@ -190,6 +241,7 @@ def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage
     time.sleep(1.0)
     records.extend(log.read_new())
     fg_after = foreground_process()
+    sampler.stop()
     # UE 5.7 broadcasts OnAssetReimport twice per texture import; count distinct imports.
     unique = {}
     for r in records:
@@ -215,7 +267,10 @@ def trial(args, log, label, names, mode="atomic", size=1024, timeout=40.0, stage
          "unknown" if all(v is None for v in md5_match.values()) else md5_match),
         "ue_foreground_before": fg_before == UE,
         "ue_became_foreground": fg_before != UE and fg_after == UE,
+        "ue_foreground_seen": UE in sampler.seen,
         "foreground_before": fg_before, "foreground_after": fg_after,
+        "foreground_seen": sampler.seen, "foreground_samples": sampler.samples,
+        "holder": holder, "holder_front_before": bool(holder) and fg_before == holder,
         "errors": [r for r in records if r["kind"] not in ("reimport", "post_import", "command")][:5],
         "settings_kept": sorted({(r.get("srgb"), r.get("compression_settings")) for r in reimports}),
         "dirty_count": len(reimports[-1].get("dirty", [])) if reimports else None,
@@ -347,6 +402,7 @@ def main() -> int:
     parser.add_argument("--slow-pause", type=float, default=2.5)
     parser.add_argument("--threshold", type=float, default=1.0)
     parser.add_argument("--no-throttle", action="store_true")
+    parser.add_argument("--focus-log", help="serve: record foreground changes to this JSONL file")
     args = parser.parse_args()
     log = ProbeLog(args.log)
     names = sorted(n for n in os.listdir(args.source) if n.lower().endswith(".png"))
@@ -369,19 +425,37 @@ def main() -> int:
             "median_last_s": statistics.median(lasts) if lasts else None,
             "max_last_s": max(lasts, default=None),
             "focus_changed": sum(1 for r in results if r["foreground_before"] != r["foreground_after"]),
+            "ue_became_foreground": sum(1 for r in results if r["ue_became_foreground"]),
+            "ue_foreground_seen": sum(1 for r in results if r["ue_foreground_seen"]),
+            "holder_front_before": sum(1 for r in results if r["holder_front_before"]),
         }
         print("SERIES", label, json.dumps(summary[label]))
 
     if args.plan == "serve":
         # Keep one configured editor running for end-to-end runs until <commands>/stop_serve exists.
         editor.start(threshold=args.threshold, throttle=not args.no_throttle)
+        sampler = FocusSampler(args.focus_log).start() if args.focus_log else None
         stop_file = os.path.join(args.commands, "stop_serve")
         while not os.path.exists(stop_file):
             time.sleep(1)
         os.remove(stop_file)
+        if sampler:
+            sampler.stop()
+            print("FOCUS", json.dumps({"samples": sampler.samples, "seen": sampler.seen,
+                                       "changes": len(sampler.changes)}))
         editor.stop()
     elif args.plan == "offline":
         offline_plan(args, log, editor, names)
+    elif args.plan == "focus":
+        # R-004: does a background reimport take the foreground from Painter?
+        # Painter is brought to front before each trial; UE stays visible behind it or
+        # minimized. The UE-foreground series is the control.
+        settings(threshold=args.threshold, throttle=not args.no_throttle)
+        for files_label, files, reps in (("part3", one_part, args.reps), ("all12", names, 5)):
+            series(f"focus_{files_label}_bg", files, "ue_background", reps, holder=PAINTER)
+            series(f"focus_{files_label}_min", files, "ue_minimized", reps, holder=PAINTER)
+            series(f"focus_{files_label}_uefront", files, "ue_foreground", reps)
+        editor.stop()
     elif args.plan == "quick":
         settings(threshold=1.0, throttle=True)
         series("quick_part_bg", one_part, "ue_background", 2)
