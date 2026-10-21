@@ -169,7 +169,12 @@ an existing topic record before creating one.
 Issue comments are working material, not a permanent record: progress, review
 and acceptance comments are added as work goes on. A new comment carries new
 facts only; a mistake or outdated statement in one's own comment is corrected
-by editing that comment, never by a follow-up correction. When the user asks to
+by editing that comment, never by a follow-up correction. Readers start from the
+newest comment, so every new comment ends with a footer of one to three lines,
+`**当前状态**：…`, giving the state of the whole issue (not only of that
+comment's topic) and the next step with who takes it. Between tidies the last
+comment is therefore the current state; earlier comments and an earlier status
+comment are not edited just to keep them current. When the user asks to
 tidy an issue's comments, and when an issue closes, merge what still matters
 into one status comment (format below) or its maintained owner (ADR, #1,
 README, `docs/history/`) and delete the rest; outdated content is simply
@@ -180,10 +185,11 @@ scratch after the evidence it held is preserved.
 ## Issue status comment
 
 Tidying an issue's comments on the user's request, or closing it, produces one
-status comment in this format; on an open issue new comments then accumulate
-again until the next tidy. Like
-every comment, it states the current fact: no change logs, "updated per
-request" notes or labels for what was removed.
+status comment in this format; on an open issue new comments, each with its
+`当前状态` footer, then accumulate below it until the next tidy. The status
+comment's 状态 and 下一步 sections serve as its footer. Like every comment, it
+states the current fact: no change logs, "updated per request" notes or labels
+for what was removed.
 
 ```markdown
 <!-- issue-status:v1 issue=2 -->
