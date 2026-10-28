@@ -1,9 +1,11 @@
 # Development workflow
 
-This is the lifecycle of StoUTextureSync work, from requirement to archive. It
-needs only this repository and `gh` run from its clone. Normative constraints
-live in [AGENTS.md](../AGENTS.md); this document says where each kind of
-information goes and when a task is finished.
+This is the lifecycle of StoUTextureSync work, from requirement to archive,
+shared by people and agents. It needs only this repository and `gh` run from
+its clone. It says where each kind of information goes, how changes are
+designed, reviewed and verified, and when a task is finished. Runtime, host
+and repository constraints live in [AGENTS.md](../AGENTS.md), which links the
+design, fix and verification-scope rules here.
 
 ## Owners
 
@@ -57,7 +59,22 @@ route decision, not a releasable plug-in. Prototype code that must be kept
 goes through a PR and stays outside `plugins/` unless it becomes product code;
 one-off harnesses stay in scratch.
 
-## 2. Delivery and review
+## 2. Design before implementation
+
+| Change | State before implementing | Record and decision |
+| --- | --- | --- |
+| Local fix or small feature; interfaces and state ownership unchanged | Real call chain, change location, directly affected behavior and how it will be verified | A short note in the task; no separate document |
+| Cross-module feature, or a change to a public interface, the file/metadata contract between hosts, or state/resource ownership | Reused capabilities, module responsibilities, data/state flow, failure recovery, compatibility and behavior that must be preserved | The milestone or child issue; one review of the key design before implementing |
+| The approach depends on an unproven Painter or UE capability | The open question that decides the approach | Settle it with a minimal prototype or experiment, kept as M0 prototypes are, before building further |
+
+Make ordinary implementation choices without asking. Changing agreed product
+semantics or an important trade-off is the user's decision (see *Let decisions
+change*). Cite an existing design, issue section or ADR when it suffices;
+write an ADR only for a new long-lived decision. Once responsibilities,
+contracts and acceptance are clear and no open question affects the approach,
+start implementing.
+
+## 3. Delivery and review
 
 - **Small direct changes.** Wording, typo, link and formatting fixes, and
   small edits to rules, the workflow, templates or `CHANGELOG.md`, are
@@ -81,7 +98,8 @@ one-off harnesses stay in scratch.
   named SHAs, and check acceptance, failure paths, lifecycle (`close_plugin()`,
   reload) and unrelated changes. Each finding gets an `R-xxx` ID with trigger,
   impact, evidence and completion condition; severity and blocking are separate
-  judgments. A claimed fix stays *fixed, pending re-review* until reviewed.
+  judgments. Act on findings as section 4 describes. A claimed fix stays
+  *fixed, pending re-review* until reviewed.
   When the author's own account publishes the review, it is a PR comment with
   baseline, scope, conclusion and evidence, not a GitHub approval.
 - **Re-review after change.** Approval covers the stated SHA. Later commits or
@@ -95,10 +113,40 @@ one-off harnesses stay in scratch.
   `main` SHA, AC covered, state reached (implemented, reviewed, merged,
   host-verified) and what remains.
 
+## 4. Review findings and fixes
+
+- Confirm a finding through the code path, a contract or a reproduction before
+  changing the implementation.
+- Before editing, check the actual callers and the owner of the affected state
+  or resource, and fix the root cause there. Recheck the original problem and
+  the existing behavior the fix touches; reuse evidence that remains valid.
+- Do not make a new failure pass by swallowing errors, deleting assertions,
+  loosening thresholds or rewriting acceptance. Correcting a wrong check needs
+  independent evidence. A fix that changes an interface or state ownership goes
+  back to the design step.
+- When the same kind of problem keeps returning in a third review round, stop
+  stacking patches: diagnose the root cause, narrow the change or redesign it.
+  Confirmed blockers stay blocking.
+- Style preferences and improvements unrelated to the change do not drive
+  rework; record them as follow-up candidates in the issue.
+
+## 5. Verification scope
+
+- At the start, state briefly what behavior must be shown and the smallest
+  check that shows it. Keep the required checks in AGENTS.md, including host
+  evidence for the changes it lists; add more only for uncovered acceptance, an
+  actual failure or evidenced regression risk.
+- Do not add tests or defensive branches (retries, compatibility layers,
+  settings, fallbacks) for cases with no real trigger. Keep targeted checks for
+  reachable paths that could overwrite or delete user source images or damage a
+  Painter project or UE assets.
+- Stop when the required checks pass, acceptance is covered and no blocker
+  remains. After a fix, rerun only what it affects.
+
 Ordinary checks (`tools/validate_project.py`, compileall, unit tests, CI) are
 local evidence only. They never establish host compatibility.
 
-## 3. Host acceptance
+## 6. Host acceptance
 
 Events, export, UI, file publication timing, UE reimport and lifecycle need
 evidence in the declared hosts: Painter 11.0 and the official Unreal Editor
@@ -119,7 +167,7 @@ A host that was not tested stays unverified even when another host passed.
 Measurements that support a conclusion and would otherwise be lost (timings,
 memory peaks, visual owner acceptance) go into a history record at closure.
 
-## 4. Closure
+## 7. Closure
 
 Close a milestone issue explicitly when the conditions below hold. Closing is
 also a tidy: the status comment (see Archival) is rewritten to its final state,
@@ -135,7 +183,7 @@ milestone does not release it: packaging, the `v<version>` tag and the GitHub
 release follow the release rules in AGENTS.md as a separate step, and the
 collection updates its submodule pin only after the release commit is published.
 
-## 5. Keeping the requirements current
+## 8. Keeping the requirements current
 
 Issue #1 owns the requirements while they are undelivered. Once a milestone
 closes, its delivered requirements are owned by the maintained product:
@@ -158,7 +206,7 @@ is delivered, dropped by decision, or moved to its own issue. No second
 requirement baseline is maintained in the repository; `docs/history/` drafts
 are the original source record only.
 
-## 6. Archival
+## 9. Archival
 
 Most closed work needs no extra document: its evidence stays in the PR and
 issue. At milestone closure, use [docs/history/](history/README.md) for what a

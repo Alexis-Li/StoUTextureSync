@@ -42,7 +42,8 @@ Clone this repository on its own or initialize its submodule in the collection.
 Use a branch in this repository for changes; it owns its Issues, PRs and releases.
 No parent checkout is required. Read [AGENTS.md](AGENTS.md) before editing;
 [docs/workflow.md](docs/workflow.md) describes how requirements become
-milestones and how work is reviewed, accepted in the hosts and archived.
+milestones and how work is designed, reviewed, verified, accepted in the hosts
+and archived.
 
 With Python 3.10 or newer, run the scaffold checks:
 

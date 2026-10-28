@@ -60,6 +60,9 @@ registration and pinned commit. Do not change sibling projects.
 
 ## Verification and release
 
+Before implementing, and when acting on review findings, follow the design,
+fix and verification-scope rules in docs/workflow.md.
+
 Run `python tools/validate_project.py` and `python -m compileall -q plugins`
 for scaffold changes. Add meaningful project tests as functionality appears;
 run focused tests first and broaden when affected behavior warrants it.
