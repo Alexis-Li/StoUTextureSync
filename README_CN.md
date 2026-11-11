@@ -32,9 +32,9 @@ Texture Set 命名。自动与手动同步使用相同质量及所选 Painter �
 
 ## 开发
 
-可以独立克隆本仓库，也可在合集仓库中初始化对应子模块。代码变更在本仓库的分支
-进行，Issues、PR 和发布也由本仓库管理；独立开发不依赖父仓库目录。
-修改前阅读 [AGENTS.md](AGENTS.md)；需求如何拆成里程碑、如何设计、评审、验证、宿主验收和归档见
+可以独立克隆本仓库，也可在合集仓库中初始化对应子模块。本仓库拥有 Issues、PR
+和发布，独立克隆即可开发。修改前阅读 [AGENTS.md](AGENTS.md)，按工作流选择
+集成分支和 PR 的交付边界。需求如何拆成里程碑、如何设计、评审、验证、宿主验收和归档见
 [docs/workflow.md](docs/workflow.md)。
 
 使用 Python 3.10 或更高版本运行骨架检查：
@@ -56,8 +56,9 @@ python tools/version.py set 0.1.0    # 设置版本并发布 CHANGELOG 条目
 python tools/package_sp.py           # 生成 dist/StoUTextureSync-<version>-SP.zip
 ```
 
-`set` 只接受更大的 `MAJOR.MINOR.PATCH` 版本，并把 [CHANGELOG.md](CHANGELOG.md)
-中 `Unreleased` 下的条目移到该版本的标题下。归档只含一个 `stou_texture_sync/`
+仅在发布变更中设置产品版本。`set` 接受更大的 `MAJOR.MINOR.PATCH` 版本，
+并把 [CHANGELOG.md](CHANGELOG.md) 中 `Unreleased` 下的条目移到该版本的标题下。
+归档只含一个 `stou_texture_sync/`
 目录，内有运行所需的 Python 文件和 LICENSE，用于解压到 Painter 的
 `<Documents>/Adobe/Adobe Substance 3D Painter/python/plugins` 目录。运行目录中
 出现其他文件或使用了高于 Painter Python 3.11 的语法时停止打包。从归档安装尚未在

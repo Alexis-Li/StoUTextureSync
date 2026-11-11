@@ -9,7 +9,7 @@ See the [development workflow](../workflow.md) for when records are written.
 The requirement draft and technical notes as last edited before the product
 moved into this repository. They are the original source record and are not
 edited; current requirements are owned as described in the
-[workflow](../workflow.md#5-keeping-the-requirements-current).
+[workflow](../workflow.md#8-keeping-the-requirements-current).
 
 - [requirements.md](requirements.md): product scope, functional requirements,
   validation plan and milestones.

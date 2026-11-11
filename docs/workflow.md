@@ -63,9 +63,15 @@ one-off harnesses stay in scratch.
 
 | Change | State before implementing | Record and decision |
 | --- | --- | --- |
-| Local fix or small feature; interfaces and state ownership unchanged | Real call chain, change location, directly affected behavior and how it will be verified | A short note in the task; no separate document |
-| Cross-module feature, or a change to a public interface, the file/metadata contract between hosts, or state/resource ownership | Reused capabilities, module responsibilities, data/state flow, failure recovery, compatibility and behavior that must be preserved | The milestone or child issue; one review of the key design before implementing |
-| The approach depends on an unproven Painter or UE capability | The open question that decides the approach | Settle it with a minimal prototype or experiment, kept as M0 prototypes are, before building further |
+| Local fix or small feature with interfaces and state ownership unchanged | Real call chain, change location, directly affected behavior and how it will be verified | A short note in the task |
+| Cross-module feature, or a change to a public interface, the file/metadata contract between hosts, or state/resource ownership | Reused capabilities, module responsibilities, data/state flow, failure recovery, compatibility and behavior that must be preserved. Map each AC to the lowest test level that exercises it, including any driver scenario, fixture field or test hook needed for unattended execution | The milestone or child issue, with one review of the key design before implementing |
+| The approach depends on an unproven Painter or UE capability | The open question that decides the approach | Settle it with a minimal prototype or experiment before building further, keeping it under the M0 prototype rules |
+
+Design acceptance so a test can observe the behavior. If a check requires a
+person at the hosts, name it as manual in the acceptance criteria and explain
+why. M1's tablet painting and acceptable drawing interruption checks retain
+the user's judgment required by its AC-07. Build reusable fixtures when an
+affected case needs them and document their inputs and reproduction entry.
 
 Make ordinary implementation choices without asking. Changing agreed product
 semantics or an important trade-off is the user's decision (see *Let decisions
@@ -77,41 +83,80 @@ start implementing.
 ## 3. Delivery and review
 
 - **Small direct changes.** Wording, typo, link and formatting fixes, and
-  small edits to rules, the workflow, templates or `CHANGELOG.md`, are
-  committed to the branch currently being worked on, without a separate branch
-  or PR, when they change no code, tests, tools, CI, packaging, version, ADR or
-  product decision. They reach `main` with that branch; only when no
-  development branch is in progress is the current branch `main` itself. Run
-  `tools/validate_project.py` first, push a normal commit (never rewrite shared
-  history), and use a PR whenever the size or impact is unclear.
-- **Branch.** Everything else goes through a PR: development tasks, code
-  changes and significant changes. Work on `feature/<topic>` for new
-  capability, tooling or documentation, or `fix/<topic>` for corrections,
-  branched from `main`, and open a PR back to `main`. Use a short kebab-case
-  topic and one PR per reviewable piece; a milestone usually has several.
-  GitHub deletes the head branch when the PR is merged.
+  small edits to rules, the workflow, templates or `CHANGELOG.md`, go directly
+  on the integration branch in progress when they change no code, tests, tools,
+  CI, packaging, version, ADR or product decision. Use `main` when no
+  integration branch is in progress. They reach `main` with that branch and
+  need no separate branch, PR, development report or review report. Keep them
+  off PR branches. Run applicable checks and use normal commits without
+  rewriting shared history. Use a PR whenever size or impact is unclear.
+- **Branch.** Development tasks, code changes and significant changes go
+  through a PR. Cut `feature/<topic>` for new capability, tooling or
+  documentation, or `fix/<topic>` for corrections, from the integration branch
+  in progress (`main` when none is), with a PR back to it. Use a short
+  kebab-case topic and one PR per reviewable piece. A PR branch holds only its
+  PR's change. Inspect local changes before switching branches. Serial work
+  can reuse a checkout. Concurrent writers need isolated checkouts and clear
+  file ownership.
 - **Describe the delivery.** The PR template records the issue and AC/finding
-  IDs covered, the full base and head SHAs, the checks actually run and what
-  remains. Use `Refs #<issue>`, never a closing keyword: merging into `main`
-  would close the issue before host acceptance.
-- **Review the actual change.** Read the issue, then the complete diff at the
-  named SHAs, and check acceptance, failure paths, lifecycle (`close_plugin()`,
-  reload) and unrelated changes. Each finding gets an `R-xxx` ID with trigger,
-  impact, evidence and completion condition; severity and blocking are separate
-  judgments. Act on findings as section 4 describes. A claimed fix stays
-  *fixed, pending re-review* until reviewed.
-  When the author's own account publishes the review, it is a PR comment with
-  baseline, scope, conclusion and evidence, not a GitHub approval.
-- **Re-review after change.** Approval covers the stated SHA. Later commits or
-  `main` drift that touch the reviewed scope need an incremental review and the
-  affected checks before merge.
-- **Merge.** Merge only after the review of the head SHA is published; the
-  user's merge authorization does not replace it. Merge with
-  `gh pr merge --match-head-commit <reviewed-head>`. Merge follows the user's
-  authorization.
-- **Update the issue.** Comment on the issue: PR and commits, the resulting
-  `main` SHA, AC covered, state reached (implemented, reviewed, merged,
-  host-verified) and what remains.
+  IDs covered, target branch, full base and head SHAs, resulting behavior,
+  checks actually run and what remains. Use `Refs #<issue>` and avoid closing
+  keywords. Close the issue explicitly after acceptance and integration.
+  Delivery ends with the PR reported as **待审核**, where the implementer
+  hands it over.
+- **Review the actual change.** The reviewer is independent of implementation.
+  Whoever wrote or fixed the change hands its review and fix rechecks to
+  another reviewer. The PR stays **待审核** until that review occurs. Read the
+  issue and all comments, the complete diff at the named SHAs and affected
+  callers. Check acceptance, compatibility, failure paths, lifecycle
+  (`close_plugin()`, reload) and unrelated changes. Verify delivery claims
+  against code and evidence. Publish the full base/head SHAs, scope,
+  conclusion, blockers and evidence on the PR. Act on findings under section 4.
+- **Merge.** Every merge requires a published review of the latest head SHA,
+  including when the user has authorized the merge. Recheck the head and target
+  branch, assess changes since review and run affected checks. Merge with
+  `gh pr merge --match-head-commit <reviewed-head>`. Keep GitHub's automatic
+  head-branch deletion enabled. After merge, run `git fetch --prune origin`,
+  remove the head branch's local worktree and delete its local branch when
+  the checkout is clean and the branch is contained in the target. For a
+  reused checkout, switch to the target before deleting the local head branch.
+  Preserve dirty or unmerged checkouts and another active session's worktree,
+  and report any cleanup left pending.
+- **Update the issue.** Record the PR and commits, resulting `main` or
+  integration-branch SHA, covered ACs, state reached and remaining acceptance
+  in the issue's progress comment. Keep the integration result there so it
+  stays with whole-issue acceptance.
+
+Commit, push, PR creation, merge, tracker updates, closure and deletion follow
+the task's authorization. Report the state reached precisely as implemented,
+reviewed, integrated, host-verified or released.
+
+### Review baselines and integration checks
+
+- Approval covers the stated scope, full head SHA and comparison base.
+  Uncommitted work needs a reproducible diff and relevant untracked inputs to
+  establish its baseline.
+- Later changes affecting that scope need incremental review and relevant
+  checks. Inspect changed paths and dependencies before reusing evidence.
+  Target-branch drift and conflict resolution can alter behavior with an
+  unchanged head SHA. Explain why reused evidence still applies.
+- Check target drift and the integration result alongside the head-SHA guard.
+  Squash and rebase change commit identity. Retain the reviewed range and
+  resulting integration SHA in the issue's progress or status comment.
+- Distinguish executed checks, inspected historical results and source-based
+  inference. CI runs project validation, compileall, M0 logic tests, tool tests
+  and the Painter archive build. Host acceptance needs its own evidence.
+- A scoped review can pass while whole-issue acceptance remains pending.
+  Each `R-xxx` finding needs a trigger, impact, evidence and completion
+  condition. Severity and blocking are separate judgments. Keep each ID through
+  fixes and re-review. A claimed fix stays **已修复，待复验** until an
+  independent reviewer rechecks it. Classify open work as **已确认缺陷**,
+  **待验证风险**, **验收缺口** or **后续候选**, with the next actor and
+  completion condition. Candidates enter blocking scope through an agreed
+  scope change.
+
+When the independent review is published from the author's account, record it
+as a PR comment with baseline, scope, conclusion, evidence and reviewer identity.
 
 ## 4. Review findings and fixes
 
@@ -169,19 +214,20 @@ memory peaks, visual owner acceptance) go into a history record at closure.
 
 ## 7. Closure
 
-Close a milestone issue explicitly when the conditions below hold. Closing is
-also a tidy: the status comment (see Archival) is rewritten to its final state,
-`已关闭` with the final review, the integration SHA on `main` and the host
-acceptance results, and the other comments are deleted. Close when:
+Close a milestone issue explicitly when the conditions below hold. Closure
+includes the consolidation in section 9. Its status comment says `已关闭` and
+contains the final review, integration SHA on `main` and acceptance results.
 
 - every AC is met, or dropped or moved with the user's recorded decision;
 - no blocking `R-xxx` finding is open;
 - the delivery is on `main` and the host evidence matches that code.
 
-Validation milestones close against their evidence and decision. Closing a
-milestone does not release it: packaging, the `v<version>` tag and the GitHub
-release follow the release rules in AGENTS.md as a separate step, and the
-collection updates its submodule pin only after the release commit is published.
+Child, feature and bug issues close once their agreed acceptance is covered,
+blockers are resolved and delivery is on the intended integration branch.
+Record that branch and its integration SHA. Research and validation tasks
+close against their own evidence, deliverable and decision. Milestone
+integration into `main` and [release](#release) each have their own completion
+conditions.
 
 ## 8. Keeping the requirements current
 
@@ -225,10 +271,34 @@ comment is therefore the current state; earlier comments and an earlier status
 comment are not edited just to keep them current. When the user asks to
 tidy an issue's comments, and when an issue closes, merge what still matters
 into one status comment (format below) or its maintained owner (ADR, #1,
-README, `docs/history/`) and delete the rest; outdated content is simply
-dropped. Git does not keep remote comments, so anything a future decision or
-regression check needs must reach a repository owner first. Remove task-owned
-scratch after the evidence it held is preserved.
+README, `docs/history/`). Follow this consolidation sequence within the task's
+authorization.
+
+1. **Inventory.** Read the issue, paginate all comments and inspect linked
+   evidence, both scratch locations and known task outputs. Establish ownership
+   and ongoing use. Preserve shared inputs and uncertain files.
+2. **Preserve useful knowledge.** Move evidence needed for future decisions or
+   regression checks into its maintained owner and link it from the status
+   comment. Keep requirements in their owning issue. Commit and publish any
+   necessary repository content before deleting source comments. If publication
+   is unavailable, retain dependent comments and report the pending work.
+3. **Consolidate.** Create or edit the status comment with the current
+   conclusion, useful evidence and next actions. At closure it says `已关闭`
+   and includes the final review, integration SHA and acceptance results.
+   Read back the saved comment and verify its evidence links. Redirect links
+   to comments being removed to their maintained destinations.
+4. **Clean.** Re-read targeted comments, reconcile concurrent edits and delete
+   the other comments by exact numeric ID. Remove task-owned scratch after its
+   needed evidence has reached the maintained owner, including helpers, drafts,
+   payloads and results. Verify resolved deletion paths are within the intended
+   scratch directory. Preserve reusable acceptance fixtures, user-created source
+   images and shared or uncertain files. Keep fixture setup and reproduction
+   instructions current with the affected tests or host probes.
+5. **Verify.** Paginate comments to confirm that one status comment remains.
+   Check evidence links, publication state and scratch after the last helper
+   run. Report unfinished cleanup with its reason and next actor. Close the
+   issue after its acceptance and integration conditions are met, using its
+   consolidated status comment as the closure record.
 
 ## Issue status comment
 
@@ -244,7 +314,7 @@ for what was removed.
 ## 状态
 
 - 状态：进行中 / 待审核 / 待验证 / 受阻 / 可关闭 / 已关闭
-- 基线：<main SHA or package version>
+- 基线：<full implementation, final review and integration SHAs or package version>
 - 更新日期：YYYY-MM-DD
 
 ### 简介
@@ -257,18 +327,65 @@ for what was removed.
 ### 下一步
 ```
 
-- 简介: what the issue delivers and where it stands, in a few sentences.
-- 相关提交: PRs and commits with full SHAs and a one-line summary each.
-- 已完成 / 未完成: by AC, PoC or requirement ID, with evidence links.
-- 开发边界: what is in and out of scope, and items moved to another issue.
-- 决定: decisions in force, linking their ADR or #1 section.
-- 宿主验收: the content listed in Host acceptance, or `无`.
-- 下一步: concrete next actions and who takes them.
+- **简介** states what the issue delivers and its current conclusion.
+- **相关提交** lists PRs and commits with full SHAs, their purpose and the final
+  review link. Distinguish implementation, review and integration baselines.
+- **已完成 / 未完成** covers AC, PoC or requirement IDs, evidence, unresolved
+  findings, acceptance gaps and completion conditions. `可关闭` and `已关闭`
+  require all agreed acceptance covered and no blocking findings.
+- **开发边界** gives scope, exclusions, evidence limits and work moved elsewhere.
+- **决定** links decisions in force to their ADR or #1 section.
+- **宿主验收** supplies the evidence listed in section 6. Distinguish current
+  runs from historical evidence and explain why reused evidence applies.
+- **下一步** gives concrete actions and responsible actors, or `无` when done.
 
-Write `无` in an empty section, never leave placeholders. Use
-repository-relative paths or placeholders such as `<Painter11>` or `<scratch>`,
-never drive letters or user directories. Before editing, re-read the issue and
-all its comments (`gh issue view <n> --comments`). Create the comment with
-`gh issue comment <n> --body-file <draft.md>`; edit it by its numeric ID through
-`gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> --input
-<payload.json>`. Never use `--edit-last`.
+Keep the first-line marker and section order, fill every section and write
+`无` when empty. Replace placeholders and use the task's timezone for the date.
+Check the format, state, baselines, portable paths, evidence links and unresolved
+blockers before publishing.
+
+## Publishing tracker updates
+
+Use `gh` from this clone. Issue/PR bodies, reviews, comments and archive
+metadata use repository-relative paths or placeholders such as `<Painter11>`,
+`<Project.uproject>` or `<scratch>`. Keep local drive paths, user directories,
+credentials and private asset contents out of published material. Prepare
+multiline bodies and JSON payloads as UTF-8 files in the scratch location
+resolved under [AGENTS.md](../AGENTS.md).
+
+Read the issue and paginate all comments before writing. For a status comment,
+match its marker and issue number, and reconcile multiple matches before
+editing by exact numeric comment ID. Create with
+`gh issue comment <number> --body-file <draft.md>`.
+
+Before editing, read
+`gh api repos/{owner}/{repo}/issues/comments/<id>` and verify `issue_url`,
+ownership, body, marker when present and `updated_at`. Re-read immediately
+before writing and reconcile concurrent changes. Send the full body through
+`gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> --input <payload.json>`.
+Use exact IDs for edits. Read back the saved body and return its URL. After
+an ambiguous timeout, read before retrying. Serialize writes per issue under
+one publishing coordinator and account for concurrent edits between reads.
+
+Local checks and repository instructions guide publication. GitHub settings
+determine server enforcement. CI validates repository artifacts, while review,
+host acceptance and authorization each require their own evidence.
+
+## Release
+
+- Only the release change sets the product version in
+  `plugins/stou_texture_sync/__init__.py`. Other changes retain it. A future UE
+  component shares that version and documents its separate host installation.
+- Add user-visible changes under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md)
+  as work is delivered, following AGENTS.md. In the release change, run
+  `python tools/version.py set <version>` with a greater `MAJOR.MINOR.PATCH`.
+  It updates the single version and moves the entries under the version and
+  date, retaining an empty `Unreleased` section.
+- Run `python tools/package_sp.py` to build
+  `dist/StoUTextureSync-<version>-SP.zip`. It contains the installable runtime
+  Python files and LICENSE under one `stou_texture_sync/` directory. Validate
+  installation, reload and removal from that archive in Painter before
+  publishing it. M1 owns installation acceptance for the first usable version.
+- Release tags use `v<version>`. Record the tested package/version and exact
+  source SHA with the host evidence. The collection updates its pin after the
+  chosen product commit is published and reviewed.

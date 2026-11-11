@@ -39,8 +39,9 @@ Reopening or switching projects restores configuration with real-time sync off.
 ## Development
 
 Clone this repository on its own or initialize its submodule in the collection.
-Use a branch in this repository for changes; it owns its Issues, PRs and releases.
-No parent checkout is required. Read [AGENTS.md](AGENTS.md) before editing;
+This repository owns its Issues, PRs and releases. Read [AGENTS.md](AGENTS.md)
+before editing and follow the workflow's integration-branch and PR boundaries.
+Development works from this standalone clone.
 [docs/workflow.md](docs/workflow.md) describes how requirements become
 milestones and how work is designed, reviewed, verified, accepted in the hosts
 and archived.
@@ -65,8 +66,9 @@ python tools/version.py set 0.1.0    # set it and release the CHANGELOG entries
 python tools/package_sp.py           # build dist/StoUTextureSync-<version>-SP.zip
 ```
 
-`set` accepts only a greater `MAJOR.MINOR.PATCH` version and moves the
-`Unreleased` entries of [CHANGELOG.md](CHANGELOG.md) under a heading for it.
+Only the release change sets the product version. `set` accepts a greater
+`MAJOR.MINOR.PATCH` version and moves the `Unreleased` entries of
+[CHANGELOG.md](CHANGELOG.md) under a heading for it.
 The archive contains one `stou_texture_sync/` folder with the runtime Python
 files and the LICENSE; it is meant to be extracted into Painter's
 `<Documents>/Adobe/Adobe Substance 3D Painter/python/plugins` folder. Any other

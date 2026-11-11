@@ -5,18 +5,21 @@ UE component, tooling or docs).
 
 ## Scope and delivery
 
-- Issue and covered IDs: Refs #... (AC-.., FR-.., R-...)
-- Target branch: main
-- Change range (full base SHA..head SHA):
+- Issue and covered IDs `Refs #...` (`AC-..`, `FR-..`, `R-...`)
+- Target branch `<integration branch in progress, or main when none is>`
+- Full change range `<base SHA>..<head SHA>`
 
-Use `Refs`, not a closing keyword: issues close after host acceptance.
-Note exclusions and compatibility impact.
+State exclusions and compatibility impact. Use `Refs` and avoid closing keywords.
+Close the issue explicitly after acceptance and integration. Deliver as
+**待审核** to an independent reviewer.
 
 ## Validation
 
-List the checks actually run and their result. Repository checks and CI do not
-establish host behavior; link the issue's host acceptance results, or name the
-hosts and scenarios still unverified.
+List checks actually run, their environment and result. Identify historical
+evidence being reused and explain why it applies. CI runs project validation,
+compileall, M0 logic tests, tool tests and the Painter archive build. Link the
+issue's host acceptance evidence and identify scenarios still unverified,
+including manual acceptance and its reason.
 
 ## Remaining work
 

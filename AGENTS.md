@@ -38,15 +38,18 @@ registration and pinned commit. Do not change sibling projects.
   Issue #1 as docs/workflow.md describes; do not keep another requirement
   baseline beside the Issues. docs/history/ keeps the original drafts read-only
   and the selected completed decisions and evidence under its own rules.
-- Follow docs/workflow.md for Issue/PR work: feature/<topic> or fix/<topic>
-  branches with a PR to main, `Refs #<issue>` (never closing keywords), full
-  base/head SHAs, AC and R- finding IDs, a published review of the exact head
-  SHA before every merge, `--match-head-commit` merges, issue comments that
-  each end with a `当前状态` footer for the whole issue, tidied on the user's
-  request and at explicit closure. Small documentation and rule
-  edits go on the current branch as docs/workflow.md defines. Merge,
-  closure and comment deletion follow the user's authorization. Preserve
-  unrelated work and never rewrite shared history.
+- Follow docs/workflow.md for Issue/PR work. Cut `feature/<topic>` or
+  `fix/<topic>` branches from the integration branch in progress (`main` when
+  none is), with a PR back to it. Use `Refs #<issue>` and avoid closing
+  keywords. Record full base/head SHAs and AC and R- finding IDs. Require
+  independent review of the exact head SHA before every merge and use
+  `--match-head-commit`. Implementers deliver as `待审核`.
+  A PR branch holds only its PR's change. Small documentation and rule edits
+  go directly on the integration branch under the workflow's delivery rules.
+  Every issue comment ends with a `当前状态` footer for the whole issue.
+  Tidy comments on the user's request and at explicit closure. Commit, push,
+  PR creation, merge, tracker updates, closure and deletion follow the task's
+  authorization. Preserve unrelated work and never rewrite shared history.
 - Use gh from this clone. Re-read an issue and its comments before editing,
   keep decisions in force, rewrite outdated ones in place once the user agrees,
   and use UTF-8 body files for multiline text.
@@ -58,19 +61,35 @@ registration and pinned commit. Do not change sibling projects.
 - Do not check in caches, host build output, archives, .spp projects or proprietary
   presets. Keep the GPL license and assess any third-party reuse separately.
 
-## Verification and release
+## Verification
 
 Before implementing, and when acting on review findings, follow the design,
 fix and verification-scope rules in docs/workflow.md.
 
-Run `python tools/validate_project.py` and `python -m compileall -q plugins`
-for scaffold changes. Add meaningful project tests as functionality appears;
-run focused tests first and broaden when affected behavior warrants it.
-Changes to export, events, UI, reimport or lifecycle require evidence in the
-declared hosts. Record unverified scenarios explicitly.
+Commands run from this repository's root. Run focused checks first and broaden
+when affected behavior warrants it.
 
-M1 owns the release packaging and version tooling. Painter archives use
-StoUTextureSync-<version>-SP.zip and contain only installable runtime files;
-verify an installation before publishing. Independent repository release tags
-use v<version>. The collection updates its pin after the chosen product commit
-is published and reviewed; it does not track the moving tip automatically.
+| Scope | Command |
+| --- | --- |
+| Documentation, rules and project files | `python tools/validate_project.py` |
+| Painter scaffold and runtime | `python tools/validate_project.py` and `python -m compileall -q plugins` |
+| M0 prototype logic | `python -m unittest discover -s prototypes/m0/tests` |
+| Tools, versions, packaging, CI or repository layout | `python tools/validate_project.py` and `python -m unittest discover -s tests` |
+
+Add meaningful project tests as functionality appears. Changes to export,
+events, UI, reimport or lifecycle require evidence in Painter 11.0 and the
+official Unreal Editor 5.7.4 for the affected behavior. Record unverified
+scenarios explicitly and plan unattended acceptance during design, with a
+reason for each check that needs manual acceptance.
+
+## Versions and changelog
+
+Only the release change sets the product version. Follow
+[Release](docs/workflow.md#release) for this project's version and packaging
+commands, installation acceptance and publication.
+
+User-visible changes get an entry under `Unreleased` in CHANGELOG.md, with
+their issue number. Use the panel's terms, describe the effect on users and
+state any action needed when upgrading. Group entries under `Upgrade notes`,
+`Added`, `Changed`, `Fixed` and `Removed` in that order, omitting empty groups.
+Keep review findings and routine verification evidence with their issue or PR.
