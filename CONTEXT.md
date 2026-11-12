@@ -30,13 +30,13 @@ the real-time switch state.
 _Avoid_: Full sync, automatic sync
 
 **Full sync**:
-A manual request to re-export and publish every enabled binding regardless of
-content deduplication.
+A manual request to re-export every enabled binding and publish each image whose
+content differs from its target file.
 _Avoid_: Asset submission, first import
 
 **Sync batch**:
 The outputs for one synchronization request associated with one project and
-configuration revision.
+scheduling generation.
 _Avoid_: Atomic transaction, UE frame
 
 **File published**:

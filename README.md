@@ -24,7 +24,8 @@ production scenes remain unverified.
 3. Manually import the images into UE and connect the existing materials.
 4. Configure UE Auto Reimport for those source images, then check a manual sync.
 5. Enable real-time sync to export after drawing becomes idle. Immediate sync
-   handles pending changes; full sync republishes all enabled bindings.
+   handles pending changes; full sync re-exports all enabled bindings and
+   publishes the images that differ from their targets.
 
 Output defaults to 1K, with explicit 2K exceptions per Texture Set or body part.
 Painter body Tiles map to named parts exported as ordinary images for separate
