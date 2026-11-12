@@ -24,5 +24,6 @@ Clothing and body naming modes are configured per Texture Set.
 
 M0 owns the evidence for export filters, identity, publication mechanism,
 background reimport and the five-second target. Online API documentation and
-reference plug-ins do not establish compatibility with Painter 11.0 or either
-target UE build. See [M0](https://github.com/Alexis-Li/StoUTextureSync/issues/2).
+reference plug-ins do not establish compatibility with Painter 11.0 or the
+official Unreal Editor 5.7.4.
+See [M0](https://github.com/Alexis-Li/StoUTextureSync/issues/2).
