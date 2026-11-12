@@ -15,7 +15,7 @@ SP and UE do not become separate Git repositories.
 
 Single-file completeness is required. Files may become visible one at a time;
 there is no cross-file atomicity promise. Partial failures pause automatic work
-and recover by retrying valid staged outputs or by a new full sync. These choices
+and recover through a new full sync. These choices
 avoid requiring a custom UE component solely to hide short mixed transitions.
 
 Painter UV Tiles are a drawing organization mechanism for body parts. Outputs
