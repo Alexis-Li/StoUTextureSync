@@ -18,7 +18,7 @@ Painter 导出配置提供 `exportList.filter.uvTiles`，可按 UV 坐标选择 
 
 路线 A 的 UE 工程路径用于配置隔离，内容目录用于展示预期资产位置。磁盘上的 `.uasset` 存在不能证明资产类型、导入源关联或当前运行的 UE 工程正确；这些关联由用户在 UE 核对。路线 B 可通过编辑器接口验证并返回结果。
 
-依据：[UE 自动重导入](https://dev.epicgames.com/documentation/en-us/unreal-engine/reimporting-assets-automatically-in-unreal-engine?application_version=5.7)。官方 Unreal Editor 与 Topia Engine 的验证结果分别记录。
+依据：[UE 自动重导入](https://dev.epicgames.com/documentation/en-us/unreal-engine/reimporting-assets-automatically-in-unreal-engine?application_version=5.7)。
 
 ## 调度与交互
 
