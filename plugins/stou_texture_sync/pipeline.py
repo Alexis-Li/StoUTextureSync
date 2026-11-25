@@ -48,18 +48,22 @@ _HARD_STOPS = "\r\n<>|\""
 
 
 def _match_public_url(text: str, pos: int) -> int | None:
-    """Return the URL end, leaving unmatched trailing brackets in the surrounding text."""
+    """Return the URL end, stopping before any unmatched closing bracket."""
     match = _PUBLIC_URL_RE.match(text, pos)
     if match is None:
         return None
-    end = match.end()
-    opening_brackets = {")": "(", "]": "[", "}": "{"}
-    while True:
-        closing = text[end - 1]
-        opening = opening_brackets.get(closing)
-        if opening is None or text.count(closing, pos, end) <= text.count(opening, pos, end):
-            return end
-        end -= 1
+    depth = {"(": 0, "[": 0, "{": 0}
+    closing = {")": "(", "]": "[", "}": "{"}
+    for i in range(pos, match.end()):
+        char = text[i]
+        if char in depth:
+            depth[char] += 1
+        elif char in closing:
+            opening = closing[char]
+            if depth[opening] == 0:
+                return i
+            depth[opening] -= 1
+    return match.end()
 
 
 def _quote_closes(text: str, index: int, active_quote) -> bool:

@@ -246,6 +246,10 @@ class SummaryTests(unittest.TestCase):
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
             "/private.png,https://[2606:4700::1111]/a": "<local path>,https://[2606:4700::1111]/a",
             r"https://example.com/a,C:\Private\image.png": "https://example.com/a,<local path>",
+            r"[https://example.com/a](C:\Private\image.png)":
+                "[https://example.com/a](<local path>",
+            r"[https://example.com/a(b)/c](C:\Private\image.png)":
+                "[https://example.com/a(b)/c](<local path>",
             "/private.png,/Game/Body/T,https://host/a.png": "<local path>,https://host/a.png",
         }
         kept = ["/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/BasicShapes/Cube",

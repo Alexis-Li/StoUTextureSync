@@ -784,6 +784,10 @@ class PipelineTests(WorkspaceTest):
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
             "/private.png,https://[2606:4700::1111]/a": "<local path>,https://[2606:4700::1111]/a",
             r"https://example.com/a,C:\Private\image.png": "https://example.com/a,<local path>",
+            r"[https://example.com/a](C:\Private\image.png)":
+                "[https://example.com/a](<local path>",
+            r"[https://example.com/a(b)/c](C:\Private\image.png)":
+                "[https://example.com/a(b)/c](<local path>",
             "/Users/Private Name/image.png,https://example.com/a":
                 "<local path>,https://example.com/a",
             "/Game/角色/T_Body in /private.png": "<local path>",
