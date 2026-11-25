@@ -120,7 +120,9 @@ def _correlate(batches, events) -> dict[int, float]:
                 samples_by_asset[asset].add(sample)
                 binding = (sample, asset)
                 earliest_start[binding] = min(start, earliest_start.get(binding, start))
-                publications[binding].append((start, index, file.get("sha")))
+                raw_sha = file.get("sha")
+                sha = raw_sha.strip() if isinstance(raw_sha, str) and raw_sha.strip() else None
+                publications[binding].append((start, index, sha))
 
     by_binding = defaultdict(list)
     for event in events:

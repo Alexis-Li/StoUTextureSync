@@ -171,6 +171,16 @@ class SummaryTests(unittest.TestCase):
         info = summarize(batches, events)["samples"]["body"]
         self.assertEqual(info["target"]["unmatched"], 0)
 
+    def test_malformed_sha_is_an_unknown_digest(self):
+        batches = [batch(wall, wall - 1, [("T_Body.png", "published")], sample="body")
+                   for wall in (10, 20)]
+        batches[0]["files"][0]["sha"] = []
+        batches[1]["files"][0]["sha"] = "S2"
+        events = [{"kind": "reimport", "wall": 11, "asset": "T_Body"},
+                  {"kind": "reimport", "wall": 21, "asset": "T_Body", "registry_md5": "X"}]
+        info = summarize(batches, events)["samples"]["body"]
+        self.assertEqual(info["target"], {"pass": 1, "fail": 0, "measured": 1, "unmatched": 1})
+
     def test_unlabeled_receipt_routes_only_to_a_sample_already_published(self):
         batches = [batch(10, 9, [("T_Body.png", "published")], sample="A"),
                    batch(20, 19, [("T_Body.png", "published")], sample="B")]

@@ -1,4 +1,4 @@
-"""M1a scheduling, source-image publication and diagnostic contracts."""
+﻿"""M1a scheduling, source-image publication and diagnostic contracts."""
 
 import importlib.util
 import json
@@ -17,7 +17,7 @@ from plugins import stou_texture_sync as plugin
 from plugins.stou_texture_sync import config, naming, publish
 from plugins.stou_texture_sync.pipeline import (
     PublishWorker, SyncEngine, SyncLogWriter, build_export_configs, format_status,
-    validate_binding_uniqueness, validate_export_and_plan,
+    sanitize_local_paths, validate_binding_uniqueness, validate_export_and_plan,
 )
 from plugins.stou_texture_sync.scheduler import Batch, Scheduler
 from plugins.stou_texture_sync.target_lock import LOCK_NAME, LockBusy, TargetLock
@@ -126,6 +126,41 @@ class NamingTests(unittest.TestCase):
                 naming.final_name_patterns(TEMPLATE, body, bad_udim)
         with self.assertRaises(naming.NamingError):
             naming.final_name_patterns("T_$textureSet_Albedo_$udim", shirt, None)
+
+    def test_color_space_and_tile_need_a_separator_in_precheck_and_runtime(self):
+        shirt = naming.TextureSetNaming("Shirt")
+        for template in ("U_$textureSet_Base(_$colorSpace)($udim)",
+                         "U_$textureSet_Base(_$colorSpace)(-$udim)",
+                         "U_$textureSet_Base($udim)($colorSpace)"):
+            with self.subTest(template=template):
+                for call in (lambda: naming.template_regex(template, "Shirt"),
+                             lambda: naming.final_name_patterns(template, shirt, 1001),
+                             lambda: naming.final_name("U_Shirt_Base_linear1001.png", [template], shirt)):
+                    with self.assertRaises(naming.NamingError):
+                        call()
+        naming.template_regex("T_$textureSet_Albedo(_$colorSpace)(_$udim)", "Shirt")
+        naming.template_regex("T_$textureSet_Albedo(_$colorSpace)(.$udim)", "Shirt")
+
+        settings = config.parse_config({
+            "preset": "Demo", "target_dir": "t", "stage_dir": "s",
+            "texture_sets": {"Shirt": {}, "Body": {"mode": "body_part", "tile_parts": {"1001": "linear1001"}}}})
+        templates = ["U_$textureSet_Base(_$colorSpace)($udim)", "V_$textureSet_linear1001(_$udim)"]
+        with self.assertRaises(naming.NamingError):
+            validate_binding_uniqueness(settings, templates, {"Shirt": [(0, 0)], "Body": [(0, 0)]})
+        with self.assertRaises(naming.NamingError):
+            naming.plan_names({"Shirt": ["U_Shirt_Base_linear1001.png"]}, templates,
+                              {"Shirt": shirt})
+
+    def test_source_name_patterns_follow_export_names(self):
+        def stems(template, name, udim):
+            return {(p.prefix, p.suffix) for p in naming.source_name_patterns(template, name, udim)}
+
+        self.assertEqual(stems("T_$textureSet_Base(_raw_$colorSpace)(_$udim)", "Body", 1002),
+                         {("t_body_base_1002", None), ("t_body_base_raw_", "_1002")})
+        self.assertEqual(stems("T_$textureSet_Base(_raw_$colorSpace)(_$udim)", "Body", None),
+                         {("t_body_base", None), ("t_body_base_raw_", "")})
+        with self.assertRaises(naming.NamingError):
+            naming.source_name_patterns("T_$textureSet_Base_$udim", "Body", None)
 
     def test_pattern_overlap_is_exact(self):
         lit, hole = (lambda p: naming.FinalNamePattern(p)), naming.FinalNamePattern
@@ -565,6 +600,27 @@ class PipelineTests(WorkspaceTest):
                 self.assertIn("1002", outcome.error)
                 self.assertFalse(list(self.target.iterdir()))
 
+    def test_preset_templates_with_overlapping_export_names_are_rejected_before_publishing(self):
+        templates = ["T_$textureSet_Base(_raw_$colorSpace)(_$udim)", "T_Body_Base_raw_sRGB(_$udim)"]
+        engine, _ = self.engine(enabled=True, texture_sets={
+            "Shirt": {"mode": "keep"}, "Body": {"mode": "keep"}})
+        engine.record_texture_change("Shirt", (0, 0), 1, 10)
+        batch = engine.begin_next_batch(2)
+        path = self.stage / "T_Shirt_Base_raw_sRGB_1001.png"
+        path.write_bytes(b"shirt tile")
+        outputs = {"Shirt": [str(path)]}
+        with patch.object(engine.worker, "submit", wraps=engine.worker.submit) as publish_outputs:
+            outcome = engine.submit_export_result(
+                batch, preset_templates=templates, stage_dir=self.stage,
+                export_status="Success", export_message="", planned_textures=outputs,
+                actual_textures=outputs, list_s=0, export_s=0, stall_ms=0,
+                start_wall=12, available_tiles={"Shirt": [(0, 0)], "Body": [(1, 0)]})
+            self.assertEqual(outcome.outcome, "naming_error")
+            publish_outputs.assert_not_called()
+        self.assertIn("Body", outcome.error)
+        self.assertIn("1002", outcome.error)
+        self.assertFalse(list(self.target.iterdir()))
+
     def test_regular_presets_and_body_part_mappings_have_no_name_collisions(self):
         templates = [f"T_$textureSet_{kind}(_$colorSpace)(_$udim)"
                      for kind in ("Albedo", "ARM", "Normal", "Emissive")]
@@ -654,6 +710,35 @@ class PipelineTests(WorkspaceTest):
                 self.assertEqual(bool(find_local_path_leaks([{"value": value}])), value in paths)
                 self.assertEqual(record["value"], paths.get(value, value))
                 self.assertEqual(find_local_path_leaks([record]), [])
+
+    def test_local_paths_with_spaces_apostrophes_and_adjacent_public_tokens(self):
+        from tools.summarize_sync_logs import find_local_path_leaks
+
+        redacted = {
+            "/Game/Private Name/image.png": "<local path>",
+            "/Game/My Private Name/image.png": "<local path>",
+            "/Users/O'Brien/image.png": "<local path>",
+            "open '/Users/O'Brien/image.png', retry": "open '<local path>', retry",
+            "open '/Users/a/b.png'": "open '<local path>'",
+            "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            "/Users/Private Name/image.png,/Game/角色/T_Body": "<local path>,/Game/角色/T_Body",
+        }
+        kept = (
+            "/Game/角色/T_Body", "/Game/角色/T_Body /Game/Other/T_Other",
+            "/Game/角色/T_Body https://example.com/a", "/Game/角色/T_Body in https://example.com/a",
+        )
+        path = self.root / "edges.jsonl"
+        writer = SyncLogWriter(path)
+        for value in (*redacted, *kept):
+            writer.write("test", value=value)
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        for record, value in zip(records, (*redacted, *kept), strict=True):
+            with self.subTest(value=value):
+                self.assertEqual(sanitize_local_paths(value), redacted.get(value, value))
+                self.assertEqual(record["value"], redacted.get(value, value))
+                self.assertEqual(bool(find_local_path_leaks([{"value": value}])), value in redacted)
+        self.assertEqual(sanitize_local_paths("/Game/角色/T_Body in /private.png"),
+                         "/Game/角色/T_Body in <local path>")
 
     def test_stall_includes_validation_and_worker_submission_even_on_failure(self):
         engine, _ = self.engine()

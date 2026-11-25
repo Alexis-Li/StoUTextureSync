@@ -51,6 +51,7 @@ def template_regex(template: str, texture_set: str) -> re.Pattern:
         i += 1
     if depth:
         raise NamingError(f"unbalanced '(' in template {template!r}")
+    _validate_token_boundaries(template, _parse_template(template))
     try:
         return re.compile("^" + "".join(out) + r"\.(?P<ext>[A-Za-z0-9]+)$")
     except re.error as exc:
@@ -219,12 +220,64 @@ def _variants(nodes: list, with_udim: bool) -> list[list]:
     return variants
 
 
+_BOUNDARY_FILLER_RE = re.compile(r"[A-Za-z0-9\-]*")
+
+
+def _validate_token_boundaries(template: str, nodes: list) -> None:
+    """Reject ``$colorSpace`` and ``$udim`` with no separator that a colour space cannot contain."""
+    wanted = {("tok", "colorSpace"), ("tok", "udim")}
+    for variant in _variants(nodes, with_udim=True):
+        last_index, last_token = None, None
+        for index, node in enumerate(variant):
+            if node not in wanted:
+                continue
+            if last_token is not None and node != last_token:
+                between = variant[last_index + 1:index]
+                if (all(isinstance(item, str) for item in between)
+                        and _BOUNDARY_FILLER_RE.fullmatch("".join(between))):
+                    raise NamingError(
+                        f"template {template!r}: $colorSpace and $udim need a separator other "
+                        f"than letters, digits or '-' between them")
+            last_index, last_token = index, node
+
+
+def source_name_patterns(template: str, texture_set: str,
+                         udim: int | None) -> list[FinalNamePattern]:
+    """Exact exported-stem patterns ``template`` can match for one Texture Set and Tile."""
+    template_regex(template, texture_set)
+    nodes = _parse_template(template)
+    if udim is None and any(node == ("tok", "udim") for node in nodes):
+        raise NamingError(f"{texture_set}: the preset requires a Tile suffix")
+    patterns: list[FinalNamePattern] = []
+    for variant in _variants(nodes, udim is not None):
+        before, after, hole = [], [], False
+        for node in variant:
+            if node == ("tok", "colorSpace"):
+                hole = True
+                continue
+            if node == ("tok", "textureSet"):
+                text = texture_set
+            elif node == ("tok", "udim"):
+                text = str(udim)
+            else:
+                text = node
+            (after if hole else before).append(text)
+        prefix, suffix = "".join(before), "".join(after)
+        pattern = FinalNamePattern(
+            prefix.casefold(), suffix.casefold() if hole else None,
+            f"{prefix}{'<colorSpace>' + suffix if hole else ''}.png")
+        if pattern not in patterns:
+            patterns.append(pattern)
+    return patterns
+
+
 def final_name_patterns(template: str, naming: TextureSetNaming,
                         udim: int | None) -> list[FinalNamePattern]:
     """All final-stem patterns ``template`` can produce for one Texture Set and Tile."""
     template_regex(template, naming.texture_set)
     naming.validate()
     nodes = _parse_template(template)
+    _validate_token_boundaries(template, nodes)
     if udim is None and any(node == ("tok", "udim") for node in nodes):
         raise NamingError(f"{naming.texture_set}: the preset requires a Tile suffix")
     part = None

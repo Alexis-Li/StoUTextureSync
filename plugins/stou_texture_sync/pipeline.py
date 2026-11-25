@@ -13,7 +13,8 @@ from pathlib import Path
 
 from .config import SyncConfig
 from .naming import (
-    NamingError, final_name_patterns, find_pattern_overlaps, plan_names, udim_to_uv, uv_to_udim,
+    NamingError, final_name_patterns, find_pattern_overlaps, plan_names, source_name_patterns,
+    udim_to_uv, uv_to_udim,
 )
 from .publish import STAGE_MARKER, BatchResult, publish_batch
 from .scheduler import WHOLE, Batch, Scheduler
@@ -36,9 +37,15 @@ _PUBLIC_PATH = (
     r"(?!/[^\s\"'<>|]*\.(?:png|tga|exr|jpg|jpeg|bmp|tif|tiff|psd|spp|sbsar|uproject|"
     r"uasset|umap|jsonl?|log|txt|py|bat|ps1|exe|dll|zip)\b)"
     r"(?:/[\w.-]+)+(?![\w./\\-])"
+    # A space followed by more path segments means a local path that starts with /Game/.
+    r"(?![ \t]+(?!(?:https?|resource)://)(?:[^\s\"'<>|/\\:]+[ \t]+)*[^\s\"'<>|/\\:]+[/\\])"
 )
-# A local path may contain spaces; it ends at a quote, a line break or a following public token.
-_LOCAL_PATH_TAIL = rf"(?:(?![ \t]+(?:{_PUBLIC_PATH}))[^\"'<>|\r\n])*"
+# A local path may contain spaces and apostrophes (O'Brien). It ends at a closing quote, a line
+# break, or a separator followed by a public token.
+_LOCAL_PATH_TAIL = (
+    r"(?:(?![\s,;:=(\[{]+(?:" + _PUBLIC_PATH + r"))"
+    r"(?:[^\"'<>|\r\n]|'(?=[^\s,;:)\]}\r\n])))*"
+)
 LOCAL_PATH_PATTERN = re.compile(
     rf"(?P<public>{_PUBLIC_PATH})|"
     rf"file://{_LOCAL_PATH_TAIL}|"
@@ -147,14 +154,20 @@ def validate_binding_uniqueness(config, templates, available_tiles=None) -> None
         else:
             udims = binding.tile_parts.keys() | binding.tile_size_log2.keys()
         for udim in sorted(udims) or [None]:
-            for template in templates:
+            source_items = []
+            for index, template in enumerate(templates):
                 try:
                     patterns = final_name_patterns(template, naming, udim)
+                    sources = source_name_patterns(template, name, udim)
                 except NamingError as exc:
                     if str(exc) not in errors:
                         errors.append(str(exc))
                     continue
                 items.extend(((name, udim, template), pattern) for pattern in patterns)
+                source_items.extend(((index, template), pattern) for pattern in sources)
+            for (_, first), pattern_a, (_, second), pattern_b in find_pattern_overlaps(source_items):
+                errors.append(f"{name} Tile {udim}: {pattern_a.describe()} and {pattern_b.describe()} "
+                              f"can match the same exported file: presets {first!r} and {second!r}")
     reported = set()
     for owner_a, pattern_a, owner_b, pattern_b in find_pattern_overlaps(items):
         if (owner_a, owner_b) not in reported:
