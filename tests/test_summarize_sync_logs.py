@@ -135,6 +135,42 @@ class SummaryTests(unittest.TestCase):
         samples = summarize([first, second], [event])["samples"]
         self.assertEqual([samples[sample]["target"]["unmatched"] for sample in ("A", "B")], [1, 1])
 
+    def test_older_registry_hash_only_confirms_a_republication_of_the_same_bytes(self):
+        batches = [batch(wall, wall - 1, [("T_Body.png", "published")], sample="body")
+                   for wall in (10, 20, 30)]
+        for record, sha in zip(batches, ("S1", "S2", "S3")):
+            record["files"][0]["sha"] = sha
+        events = [{"kind": "reimport", "wall": wall, "asset": "T_Body", "registry_md5": registry}
+                  for wall, registry in ((11, "X"), (22, "Y"), (33, "X"), (34, "Z"))]
+
+        info = summarize(batches, events[:3])["samples"]["body"]
+        self.assertEqual(info["target"]["unmatched"], 1)
+        self.assertEqual(info["ue_reimport_s"], {"n": 2, "median": 1.5, "p95": 2, "max": 2})
+
+        info = summarize(batches, events)["samples"]["body"]
+        self.assertEqual(info["target"]["unmatched"], 0)
+        self.assertEqual(info["ue_reimport_s"]["max"], 4)
+
+        batches[2]["files"][0]["sha"] = "S1"
+        info = summarize(batches, events[:3])["samples"]["body"]
+        self.assertEqual(info["target"]["unmatched"], 0)
+        self.assertEqual(info["ue_reimport_s"]["max"], 3)
+
+    def test_unlabeled_receipt_routes_only_to_a_sample_already_published(self):
+        batches = [batch(10, 9, [("T_Body.png", "published")], sample="A"),
+                   batch(20, 19, [("T_Body.png", "published")], sample="B")]
+        early = {"kind": "reimport", "wall": 11, "asset": "T_Body"}
+        late = {**early, "wall": 22}
+        for events, unmatched, latest in (
+            ([early], (0, 1), (1, None)),
+            ([late], (1, 1), (None, None)),
+            ([early, {**late, "sample": "B"}], (0, 0), (1, 2)),
+        ):
+            with self.subTest(events=events):
+                samples = summarize(batches, events)["samples"]
+                self.assertEqual(tuple(samples[s]["target"]["unmatched"] for s in ("A", "B")), unmatched)
+                self.assertEqual(tuple(samples[s]["ue_reimport_s"]["max"] for s in ("A", "B")), latest)
+
     def test_strict_sanitize_checks_nested_keys_and_values_without_echoing_paths(self):
         clean = {"kind": "batch", "sample": "clean", "path": "/Game/StoU/T_Test"}
         leaks = {"kind": "batch", "sample": "/Users/Private Name/project",

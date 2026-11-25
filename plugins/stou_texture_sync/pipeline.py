@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import SyncConfig
-from .naming import NamingError, plan_names, preset_example_name, udim_to_uv, uv_to_udim
+from .naming import NamingError, final_name, plan_names, preset_example_names, udim_to_uv, uv_to_udim
 from .publish import STAGE_MARKER, BatchResult, publish_batch
 from .scheduler import WHOLE, Batch, Scheduler
 from .target_lock import TargetLock
@@ -30,13 +30,18 @@ STATUS_TEXT = {
 # UE package names are virtual paths unless the suffix identifies a local file.
 _PUBLIC_PATH = (
     r"(?:https?|resource)://[^\s\"'<>|]+|"
-    r"/(?:Game|Engine|Script)(?!/[^\s\"'<>|]*\.(?:png|spp|uproject|jsonl?)\b)"
-    r"(?:/[\w.-]+)+(?![\w./-])"
+    r"(?<![A-Za-z0-9_./\\-])/(?:Game|Engine|Script)"
+    r"(?!/[^\s\"'<>|]*\.(?:png|tga|exr|jpg|jpeg|bmp|tif|tiff|psd|spp|sbsar|uproject|"
+    r"uasset|umap|jsonl?|log|txt|py|bat|ps1|exe|dll|zip)\b)"
+    r"(?:/[A-Za-z0-9_.-]+)+(?![A-Za-z0-9_./\\-])"
 )
+_LOCAL_PATH_TAIL = rf"(?:(?![ \t]+(?:{_PUBLIC_PATH}))[^\"'<>|\r\n])*"
 LOCAL_PATH_PATTERN = re.compile(
-    rf"(?<![\w])(?:(?P<public>{_PUBLIC_PATH})|"
-    rf"(?:file://|[A-Z]:[\\/]|\\\\(?=[^\\/\s]+\\)|~[/\\]|(?<![:/\\])/(?=[\w.-]))"
-    rf"(?:(?![ \t]+(?:{_PUBLIC_PATH}))[^\"'<>|\r\n])*)",
+    rf"(?P<public>{_PUBLIC_PATH})|"
+    r"file://[^\s\"'<>|]+|"
+    r"(?:(?<![A-Za-z0-9_])[A-Za-z]:[\\/]|\\\\[^\\/\s\"'<>|]+\\|"
+    rf"//[^\\/\s\"'<>|]+/|(?<![A-Za-z0-9_])~[/\\]){_LOCAL_PATH_TAIL}|"
+    r"(?<![A-Za-z0-9_./\\])/(?:[^/\s\"'<>|]+/)+[^\s\"'<>|]*",
     re.IGNORECASE,
 )
 
@@ -129,18 +134,34 @@ def validate_stage_paths(stage_dir: str, textures: dict) -> None:
 
 def validate_binding_uniqueness(config, templates, available_tiles=None) -> None:
     """Check final names across enabled bindings, including unchanged Tiles."""
-    namings, examples = {}, {}
+    owners, errors = {}, []
     for name, binding in config.texture_sets.items():
         if not binding.enabled:
             continue
-        namings[name] = binding.to_naming()
+        naming = binding.to_naming()
         if available_tiles is not None and name in available_tiles:
             udims = {uv_to_udim(u, v) for u, v in available_tiles[name]}
         else:
             udims = binding.tile_parts.keys() | binding.tile_size_log2.keys()
-        examples[name] = [preset_example_name(template, name, udim)
-                          for udim in (sorted(udims) or [None]) for template in templates]
-    plan_names(examples, templates, namings)
+        for udim in sorted(udims) or [None]:
+            for template in templates:
+                owner = (name, udim, template)
+                try:
+                    examples = preset_example_names(template, name, udim)
+                except NamingError as exc:
+                    errors.append(str(exc))
+                    continue
+                for example in examples:
+                    try:
+                        target_name = final_name(example, templates, naming)
+                    except NamingError as exc:
+                        errors.append(str(exc))
+                        continue
+                    previous_owner = owners.setdefault(target_name.casefold(), owner)
+                    if previous_owner != owner:
+                        errors.append(f"{target_name}: produced by both {previous_owner} and {owner}")
+    if errors:
+        raise NamingError("; ".join(errors))
 
 
 def validate_export_and_plan(config, templates, stage_dir, export_status, export_message,
@@ -353,7 +374,7 @@ class SyncEngine:
             if accepted:
                 self._set_status("pending")
             elif self.scheduler.paused_reason is not None:
-                self._set_status("paused", reason)
+                self._show_pending()
             else:
                 self._set_status("idle", reason)
         return accepted, reason

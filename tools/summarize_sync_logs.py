@@ -106,6 +106,7 @@ def _correlate(batches, events) -> dict[int, float]:
     """Match reimports in the publication window of each file and sample."""
     publications = defaultdict(list)
     samples_by_asset = defaultdict(set)
+    earliest_start = {}
     expected = defaultdict(set)
     for index, batch in enumerate(batches):
         sample = str(batch.get("sample") or "default")
@@ -114,30 +115,35 @@ def _correlate(batches, events) -> dict[int, float]:
                 continue
             asset = _asset_name(file.get("name"), source_image=True)
             expected[index].add(asset)
-            if asset:
+            start = _publication_time(batch, file)
+            if asset and _number(start):
                 samples_by_asset[asset].add(sample)
-                start = _publication_time(batch, file)
-                if _number(start):
-                    publications[sample, asset].append((start, index, file.get("sha")))
+                binding = (sample, asset)
+                earliest_start[binding] = min(start, earliest_start.get(binding, start))
+                publications[binding].append((start, index, file.get("sha")))
 
     by_binding = defaultdict(list)
     for event in events:
-        if event.get("kind") != "reimport" or not _number(event.get("wall")):
+        wall = event.get("wall")
+        if event.get("kind") != "reimport" or not _number(wall):
             continue
         asset = _asset_name(event.get("asset"))
         sample = event.get("sample")
         if sample:
             by_binding[str(sample), asset].append(event)
-        elif len(samples_by_asset[asset]) == 1:
-            sample, = samples_by_asset[asset]
-            by_binding[sample, asset].append(event)
+        else:
+            candidates = [s for s in samples_by_asset[asset] if earliest_start[s, asset] <= wall]
+            if len(candidates) == 1:
+                by_binding[candidates[0], asset].append(event)
 
     matched = defaultdict(dict)
     for (sample, asset), starts in publications.items():
         starts.sort(key=lambda item: item[:2])
         receipts = sorted(by_binding[sample, asset], key=lambda event: event["wall"])
         cursor = 0
-        previous = None
+        confirmed: dict[tuple[str, ...], str | None] = {}
+        has_confirmed = False
+        last_confirmed_sha: str | None = None
         for index, (start, batch_index, sha) in enumerate(starts):
             end = starts[index + 1][0] if index + 1 < len(starts) else math.inf
             while cursor < len(receipts) and receipts[cursor]["wall"] < end:
@@ -146,14 +152,16 @@ def _correlate(batches, events) -> dict[int, float]:
                 if event["wall"] < start:
                     continue
                 registry = _registry_hash(event)
-                if previous is not None:
-                    previous_sha, previous_registry = previous
-                    # A repeated or unknown receipt cannot establish that different bytes arrived.
-                    if not (sha and sha == previous_sha) and (
-                            not registry or not previous_registry or registry == previous_registry):
+                if has_confirmed:
+                    if not registry and not (sha and sha == last_confirmed_sha):
+                        continue
+                    if registry in confirmed and not (sha and sha == confirmed[registry]):
                         continue
                 matched[batch_index][asset] = event["wall"]
-                previous = sha, registry
+                if registry:
+                    confirmed[registry] = sha
+                has_confirmed = True
+                last_confirmed_sha = sha
                 break
 
     return {index: max(matched[index].values()) for index, assets in expected.items()

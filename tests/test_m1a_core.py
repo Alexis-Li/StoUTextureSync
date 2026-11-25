@@ -106,6 +106,14 @@ assert not any(name.split(".")[0] in {"substance_painter", "PySide6"} for name i
 
 
 class NamingTests(unittest.TestCase):
+    def test_preset_examples_cover_optional_color_space_with_or_without_a_tile(self):
+        self.assertEqual(naming.preset_example_names(TEMPLATE, "Shirt", 1001),
+                         ["T_Shirt_Albedo_1001.png", "T_Shirt_Albedo_sRGB_1001.png"])
+        self.assertEqual(naming.preset_example_names(TEMPLATE, "Shirt", None),
+                         ["T_Shirt_Albedo.png", "T_Shirt_Albedo_sRGB.png"])
+        self.assertEqual(naming.preset_example_names("T_$textureSet_Albedo_$colorSpace", "Shirt", None),
+                         ["T_Shirt_Albedo_sRGB.png"])
+
     def test_keep_and_body_part_rules(self):
         keep = naming.TextureSetNaming("Coat_blue")
         body = naming.TextureSetNaming("Body", mode="body_part", character_prefix="C00",
@@ -446,6 +454,10 @@ class PipelineTests(WorkspaceTest):
         self.assertIn("Painter 导出未成功", engine.status_text)
         self.assertIn("完整同步", engine.status_text)
         self.assertNotIn("立即同步", engine.status_text)
+        self.assertEqual(engine.request_immediate_sync(), (False, "请先执行完整同步以恢复"))
+        self.assertIn("已暂停", engine.status_text)
+        self.assertIn("Painter 导出未成功", engine.status_text)
+        self.assertIn("完整同步", engine.status_text)
         self.assertFalse(list(self.target.iterdir()))
 
     def test_single_tile_export_rejects_binding_wide_collision(self):
@@ -473,6 +485,31 @@ class PipelineTests(WorkspaceTest):
         ready = validate_export_and_plan(settings, [TEMPLATE], self.stage, "Success", "",
                                          outputs, outputs, {"Clothes": [(0, 0), (1, 0)]})
         self.assertEqual(ready.staged, {path.name: str(path)})
+
+    def test_single_tile_export_rejects_collision_without_optional_color_space(self):
+        engine, _ = self.engine(enabled=True, texture_sets={
+            "Shirt": {"mode": "keep", "strip_tile_suffix": False},
+            "Body": {"mode": "body_part", "tile_parts": {"1002": "Shirt"}},
+        })
+        engine.record_texture_change("Shirt", (0, 0), 1, 10)
+        batch = engine.begin_next_batch(2)
+        self.assertEqual(batch.scope, {"Shirt": {(0, 0)}})
+        path = self.stage / "T_Shirt_Base_1001.png"
+        path.write_bytes(b"shirt tile")
+        outputs = {"Shirt": [str(path)]}
+        templates = ["T_$textureSet_Base(_$colorSpace)(_$udim)", "U_$textureSet_Base_1001(_$udim)"]
+        with patch.object(engine.worker, "submit", wraps=engine.worker.submit) as publish_outputs:
+            outcome = engine.submit_export_result(
+                batch, preset_templates=templates, stage_dir=self.stage,
+                export_status="Success", export_message="", planned_textures=outputs,
+                actual_textures=outputs, list_s=0, export_s=0, stall_ms=0,
+                start_wall=12, available_tiles={"Shirt": [(0, 0)], "Body": [(1, 0)]})
+            self.assertEqual(outcome.outcome, "naming_error")
+            publish_outputs.assert_not_called()
+        self.assertIn(path.name, outcome.error)
+        self.assertIn("Body", outcome.error)
+        self.assertIn("1002", outcome.error)
+        self.assertFalse(list(self.target.iterdir()))
 
     def test_configured_tiles_detect_collisions_across_texture_sets(self):
         settings = config.parse_config(self.settings(texture_sets={
@@ -515,6 +552,31 @@ class PipelineTests(WorkspaceTest):
         self.assertIn(public[3], record["message"])
         self.assertEqual(find_local_path_leaks([record]), [])
 
+    def test_log_writer_and_strict_scan_distinguish_local_paths_from_public_tokens(self):
+        from tools.summarize_sync_logs import find_local_path_leaks
+
+        paths = {
+            "path:/data/private/a.png": "path:<local path>",
+            "/@private/a.png": "<local path>",
+            "//server/share/image.png": "<local path>",
+            r"C:\Users\a\b.png": "<local path>",
+            r"\\srv\share\a.png": "<local path>",
+            "file:///C:/a.png": "<local path>",
+            "/Game/private/a.uasset": "<local path>",
+        }
+        public = ("/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo",
+                  "https://example.com/a/b", "resource://shelf/preset?version=1")
+        path = self.root / "path-boundaries.jsonl"
+        writer = SyncLogWriter(path)
+        for value in (*paths, *public):
+            writer.write("test", value=value)
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        for record, value in zip(records, (*paths, *public), strict=True):
+            with self.subTest(value=value):
+                self.assertEqual(bool(find_local_path_leaks([{"value": value}])), value in paths)
+                self.assertEqual(record["value"], paths.get(value, value))
+                self.assertEqual(find_local_path_leaks([record]), [])
+
     def test_stall_includes_validation_and_worker_submission_even_on_failure(self):
         engine, _ = self.engine()
         engine.request_full_sync()
@@ -554,7 +616,8 @@ class PipelineTests(WorkspaceTest):
         self.assertNotIn("立即同步", status)
         engine.set_realtime_enabled(False)
         self.assertEqual(engine.status_text, status)
-        self.assertFalse(engine.request_immediate_sync()[0])
+        self.assertEqual(engine.request_immediate_sync(), (False, "请先执行完整同步以恢复"))
+        self.assertEqual(engine.status_text, status)
         self.assertTrue(engine.request_full_sync()[0])
         self.submit(engine, engine.begin_next_batch(3), {}, status="Error")
         self.assertTrue(engine.scheduler.requires_full_recovery)

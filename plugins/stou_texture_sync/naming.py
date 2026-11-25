@@ -76,8 +76,8 @@ def uv_to_udim(u: int, v: int) -> int:
     return 1001 + u + 10 * v
 
 
-def preset_example_name(template: str, texture_set: str, udim: int | None) -> str:
-    """Instantiate the template for a binding-wide collision check."""
+def preset_example_names(template: str, texture_set: str, udim: int | None) -> list[str]:
+    """Instantiate the template with and without an optional color-space group."""
     template_regex(template, texture_set)
     tokens = {"textureSet": texture_set, "colorSpace": "sRGB",
               "udim": str(udim) if udim is not None else ""}
@@ -85,8 +85,28 @@ def preset_example_name(template: str, texture_set: str, udim: int | None) -> st
         template = re.sub(r"\([^()]*\$udim[^()]*\)", "", template)
         if "$udim" in template:
             raise NamingError(f"{texture_set}: the preset requires a Tile suffix")
-    template = template.replace("(", "").replace(")", "")
-    return re.sub(r"\$([A-Za-z]+)", lambda match: tokens[match[1]], template) + ".png"
+
+    variants = [template]
+    group_starts = []
+    color_group_start = None
+    for match in re.finditer(r"\(|\)|\$colorSpace", template):
+        if match[0] == "(":
+            group_starts.append(match.start())
+        elif match[0] == ")":
+            start = group_starts.pop()
+            if start == color_group_start:
+                variants.insert(0, template[:start] + template[match.end():])
+                break
+        elif group_starts:
+            color_group_start = group_starts[-1]
+
+    examples = []
+    for variant in variants:
+        body = variant.replace("(", "").replace(")", "")
+        example = re.sub(r"\$([A-Za-z]+)", lambda match: tokens[match[1]], body) + ".png"
+        if example not in examples:
+            examples.append(example)
+    return examples
 
 
 @dataclass
