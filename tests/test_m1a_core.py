@@ -782,6 +782,7 @@ class PipelineTests(WorkspaceTest):
             "open '/Users/a/b.png' and '/Users/c/d.png'":
                 "open '<local path>' and '<local path>'",
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            "/private.png,https://[2606:4700::1111]/a": "<local path>,https://[2606:4700::1111]/a",
             r"https://example.com/a,C:\Private\image.png": "https://example.com/a,<local path>",
             "/Users/Private Name/image.png,https://example.com/a":
                 "<local path>,https://example.com/a",
@@ -789,6 +790,8 @@ class PipelineTests(WorkspaceTest):
         }
         kept = (
             "实时/立即/完整", "a / b", "1/2",
+            "https://[2606:4700::1111]/a", "https://example.com/a(b)/c",
+            "(https://example.com/a(b)/c)", "[https://[2606:4700::1111]/a]",
             "/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/Transient",
             "/Script/Engine.Texture2D", "/Engine/BasicShapes/Cube", "/Script/Engine/Texture2D",
             "https://example.com/a/b", "resource://shelf/preset?version=1",

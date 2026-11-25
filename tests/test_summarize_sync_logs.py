@@ -244,11 +244,14 @@ class SummaryTests(unittest.TestCase):
             "open '/Users/a/b.png' and 'done'": "open '<local path>' and 'done'",
             "open '/Users/O'Brien/image.png', retry": "open '<local path>', retry",
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            "/private.png,https://[2606:4700::1111]/a": "<local path>,https://[2606:4700::1111]/a",
             r"https://example.com/a,C:\Private\image.png": "https://example.com/a,<local path>",
             "/private.png,/Game/Body/T,https://host/a.png": "<local path>,https://host/a.png",
         }
         kept = ["/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/BasicShapes/Cube",
                 "/Script/Engine/Texture2D", "https://example.com/a/b", "resource://shelf/preset?version=1",
+                "https://[2606:4700::1111]/a", "https://example.com/a(b)/c",
+                "(https://example.com/a(b)/c)", "[https://[2606:4700::1111]/a]",
                 "实时/立即/完整", "a / b"]
         for value, expected in redacted.items():
             with self.subTest(value=value):

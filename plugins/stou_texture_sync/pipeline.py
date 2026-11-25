@@ -34,7 +34,7 @@ STATUS_TEXT = {
 # inside free text only public URLs are kept, so no guess about the words after a ``/Game/...``
 # token can leak a local path.
 _WHOLE_UE_PATH_RE = re.compile(r"/(?:Game|Engine|Script)(?:/[\w-]+)+(?:\.[\w-]+)?")
-_PUBLIC_URL_RE = re.compile(r"(?:https?|resource)://[^\s\"'<>|,;)\]}]+", re.IGNORECASE)
+_PUBLIC_URL_RE = re.compile(r"(?:https?|resource)://[^\s\"'<>|,;]+", re.IGNORECASE)
 _LOCAL_EXT_RE = re.compile(
     r"\.(?:png|tga|exr|jpg|jpeg|bmp|tif|tiff|psd|spp|sbsar|uproject|uasset|umap|jsonl?|log|txt|"
     r"py|bat|ps1|exe|dll|zip)$", re.IGNORECASE)
@@ -45,6 +45,21 @@ _SEPARATORS = " \t,;:=([{"
 _QUOTE_OPENERS = " \t\r\n,;:=([{"
 _CLOSING_FOLLOWERS = " \t\r\n.,;:)]}\""
 _HARD_STOPS = "\r\n<>|\""
+
+
+def _match_public_url(text: str, pos: int) -> int | None:
+    """Return the URL end, leaving unmatched trailing brackets in the surrounding text."""
+    match = _PUBLIC_URL_RE.match(text, pos)
+    if match is None:
+        return None
+    end = match.end()
+    opening_brackets = {")": "(", "]": "[", "}": "{"}
+    while True:
+        closing = text[end - 1]
+        opening = opening_brackets.get(closing)
+        if opening is None or text.count(closing, pos, end) <= text.count(opening, pos, end):
+            return end
+        end -= 1
 
 
 def _quote_closes(text: str, index: int, active_quote) -> bool:
@@ -68,7 +83,7 @@ def _local_path_end(text: str, start: int, active_quote) -> int:
             j = k
             while j < len(text) and text[j] in _SEPARATORS:
                 j += 1
-            if j < len(text) and _PUBLIC_URL_RE.match(text, j):
+            if _match_public_url(text, j) is not None:
                 break
         k += 1
     # Keep a sentence-final period that is not part of the path.
@@ -105,10 +120,10 @@ def sanitize_local_paths(value: str) -> str:
                 out.append(char)
                 pos += 1
                 continue
-        match = _PUBLIC_URL_RE.match(value, pos)
-        if match:
-            out.append(match.group(0))
-            pos = match.end()
+        url_end = _match_public_url(value, pos)
+        if url_end is not None:
+            out.append(value[pos:url_end])
+            pos = url_end
             continue
         start = _LOCAL_START_RE.match(value, pos)
         if start:
