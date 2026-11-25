@@ -999,6 +999,7 @@ class PainterControllerTests(WorkspaceTest):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         sys.modules[spec.name] = module
+        self.host_painter = module
 
         painter.project.get_uuid.return_value = "project-a"
         painter.project.is_busy.return_value = False
@@ -1055,7 +1056,7 @@ class PainterControllerTests(WorkspaceTest):
         controller._tick()
         self.assertEqual(controller.engine.scheduler.pending(), {})
         self.assertFalse(controller.request_immediate_sync()[0])
-        with patch("plugins.stou_texture_sync.host_painter.time.time", return_value=14):
+        with patch.object(self.host_painter.time, "time", return_value=14):
             controller._on_texture(SimpleNamespace(stack_id=1, tile_indices=(3, 0)))
         controller._tick()
         self.assertTrue(controller.request_immediate_sync()[0])
