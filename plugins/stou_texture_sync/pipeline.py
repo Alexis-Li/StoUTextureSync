@@ -13,8 +13,8 @@ from pathlib import Path
 
 from .config import SyncConfig
 from .naming import (
-    NamingError, final_name_patterns, find_pattern_overlaps, patterns_overlap, plan_names,
-    source_name_patterns, udim_to_uv, uv_to_udim,
+    NamingError, final_name_patterns, find_pattern_overlaps, pattern_matches_template,
+    plan_names, source_name_patterns, udim_to_uv, uv_to_udim,
 )
 from .publish import STAGE_MARKER, BatchResult, publish_batch
 from .scheduler import WHOLE, Batch, Scheduler
@@ -30,18 +30,18 @@ STATUS_TEXT = {
     "stopped": "已停止",
 }
 
-# Local-path redaction is a left-to-right scanner. Each helper matches one token anchored at the
-# current position, so a decision never depends on unrelated text further along the line.
+# Local-path redaction. A value that is exactly a UE virtual path or a public URL is kept as is;
+# inside free text only public URLs are kept, so no guess about the words after a ``/Game/...``
+# token can leak a local path.
+_WHOLE_UE_PATH_RE = re.compile(r"/(?:Game|Engine|Script)(?:/[\w-]+)+(?:\.[\w-]+)?", re.IGNORECASE)
+_WHOLE_PUBLIC_URL_RE = re.compile(r"(?:https?|resource)://[^\s\"'<>|]+", re.IGNORECASE)
 _PUBLIC_URL_RE = re.compile(r"(?:https?|resource)://[^\s\"'<>|,;)\]}]+", re.IGNORECASE)
-# UE package names are virtual paths unless the suffix identifies a local file.
-_UE_PATH_RE = re.compile(r"/(?:Game|Engine|Script)(?:/[\w.-]+)+", re.IGNORECASE)
 _LOCAL_EXT_RE = re.compile(
     r"\.(?:png|tga|exr|jpg|jpeg|bmp|tif|tiff|psd|spp|sbsar|uproject|uasset|umap|jsonl?|log|txt|"
     r"py|bat|ps1|exe|dll|zip)$", re.IGNORECASE)
 _LOCAL_START_RE = re.compile(
     r"file://|(?<![A-Za-z0-9_])[A-Za-z]:[\\/]|\\\\[^\\/\s\"'<>|]+\\|//[^\\/\s\"'<>|]+/|"
     r"(?<![A-Za-z0-9_])~[/\\]|(?<![\w./\\])/(?=[^\s/\"'<>|])", re.IGNORECASE)
-_PATH_CHAR_RE = re.compile(r"[\w./\\]")
 _SEPARATORS = " \t,;:=([{"
 _QUOTE_OPENERS = " \t\r\n,;:=([{"
 _CLOSING_FOLLOWERS = " \t\r\n.,;:)]}\""
@@ -49,48 +49,14 @@ _HARD_STOPS = "\r\n<>|\""
 
 
 def _quote_closes(text: str, index: int, active_quote) -> bool:
-    return (active_quote == "'" and text[index] == "'"
-            and (index + 1 == len(text) or text[index + 1] in _CLOSING_FOLLOWERS))
-
-
-def _spaced_local_continuation(text: str, end: int, active_quote) -> bool:
-    """Whether the words after a ``/Game/...`` token continue the same local path."""
-    k = end
-    while k < len(text):
-        while k < len(text) and text[k] in " \t":
-            k += 1
-        if k == len(text) or text[k] in "/\\" or _PUBLIC_URL_RE.match(text, k):
-            return False
-        while k < len(text) and not text[k].isspace():
-            char = text[k]
-            if char in "\\/":
-                return True
-            if char in _HARD_STOPS or char in ":,;" or _quote_closes(text, k, active_quote):
-                return False
-            k += 1
-        if k < len(text) and text[k] not in " \t":
-            return False
-    return False
-
-
-def _try_public_token(text: str, pos: int, active_quote):
-    """End index of a public URL or UE virtual path starting at ``pos``, else None."""
-    match = _PUBLIC_URL_RE.match(text, pos)
-    if match:
-        return match.end()
-    if pos > 0 and (_PATH_CHAR_RE.match(text[pos - 1]) or text[pos - 1] == "-"):
-        return None
-    match = _UE_PATH_RE.match(text, pos)
-    if not match:
-        return None
-    end = match.end()
-    if end < len(text) and (_PATH_CHAR_RE.match(text[end]) or text[end] == "-"):
-        return None
-    if _LOCAL_EXT_RE.search(match.group(0)):
-        return None
-    if end < len(text) and text[end] in " \t" and _spaced_local_continuation(text, end, active_quote):
-        return None
-    return end
+    """Whether the apostrophe at ``index`` ends the apostrophe-quoted path being scanned."""
+    if active_quote != "'" or text[index] != "'":
+        return False
+    line_end = next((i for i in range(index + 1, len(text)) if text[i] in "\r\n"), len(text))
+    # An odd number of apostrophes left on the line means a later one closes the quote.
+    if text[index + 1:line_end].count("'") % 2 == 1:
+        return False
+    return index + 1 == len(text) or text[index + 1] in _CLOSING_FOLLOWERS
 
 
 def _local_path_end(text: str, start: int, active_quote) -> int:
@@ -103,9 +69,12 @@ def _local_path_end(text: str, start: int, active_quote) -> int:
             j = k
             while j < len(text) and text[j] in _SEPARATORS:
                 j += 1
-            if j < len(text) and _try_public_token(text, j, active_quote) is not None:
+            if j < len(text) and _PUBLIC_URL_RE.match(text, j):
                 break
         k += 1
+    # Keep a sentence-final period that is not part of the path.
+    if k - 1 > start and text[k - 1] == "." and (k == len(text) or text[k].isspace()):
+        k -= 1
     return k
 
 
@@ -118,7 +87,10 @@ def _opens_quote(text: str, pos: int) -> bool:
 
 
 def sanitize_local_paths(value: str) -> str:
-    """Replace local file paths with ``<local path>``; keep URLs and UE virtual paths."""
+    """Replace local file paths with ``<local path>``; keep public URLs and whole UE virtual paths."""
+    if ((_WHOLE_UE_PATH_RE.fullmatch(value) and not _LOCAL_EXT_RE.search(value))
+            or _WHOLE_PUBLIC_URL_RE.fullmatch(value)):
+        return value
     out, pos, active_quote = [], 0, None
     while pos < len(value):
         char = value[pos]
@@ -135,10 +107,10 @@ def sanitize_local_paths(value: str) -> str:
                 out.append(char)
                 pos += 1
                 continue
-        end = _try_public_token(value, pos, active_quote)
-        if end is not None:
-            out.append(value[pos:end])
-            pos = end
+        match = _PUBLIC_URL_RE.match(value, pos)
+        if match:
+            out.append(match.group(0))
+            pos = match.end()
             continue
         start = _LOCAL_START_RE.match(value, pos)
         if start:
@@ -244,34 +216,28 @@ def validate_binding_uniqueness(config, templates, available_tiles=None) -> None
         else:
             udims = binding.tile_parts.keys() | binding.tile_size_log2.keys()
         for udim in sorted(udims) or [None]:
-            emitted, accepted = {}, {}
+            emitted = {}
             for index, template in enumerate(templates):
                 try:
                     patterns = final_name_patterns(template, naming, udim)
                     emitted[index] = source_name_patterns(template, name, udim)
-                    accepted[index] = source_name_patterns(template, name, udim,
-                                                           include_optional_udim_omit=True)
                 except NamingError as exc:
                     if str(exc) not in errors:
                         errors.append(str(exc))
                     continue
                 items.extend(((name, udim, template), pattern) for pattern in patterns)
-            # A file one preset exports must not also be accepted by another preset at run time.
-            reported_pairs = set()
+            # A file one preset exports must not also be matched by another preset at run time.
             for first in emitted:
-                for second in accepted:
-                    if first == second or frozenset((first, second)) in reported_pairs:
+                for second in emitted:
+                    if first == second:
                         continue
-                    for pattern_a in emitted[first]:
-                        clash = next((p for p in accepted[second] if patterns_overlap(pattern_a, p)),
-                                     None)
-                        if clash is not None:
-                            reported_pairs.add(frozenset((first, second)))
-                            errors.append(
-                                f"{name} Tile {udim}: {pattern_a.describe()} and {clash.describe()} "
-                                f"can match the same exported file: presets {templates[first]!r} "
-                                f"and {templates[second]!r}")
-                            break
+                    clash = next((p for p in emitted[first]
+                                  if pattern_matches_template(p, templates[second], name, udim)),
+                                 None)
+                    if clash is not None:
+                        errors.append(
+                            f"{name} Tile {udim}: {clash.describe()} can match the same exported "
+                            f"file: presets {templates[first]!r} and {templates[second]!r}")
     reported = set()
     for owner_a, pattern_a, owner_b, pattern_b in find_pattern_overlaps(items):
         if (owner_a, owner_b) not in reported:

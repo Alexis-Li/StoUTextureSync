@@ -213,8 +213,10 @@ class SummaryTests(unittest.TestCase):
     def test_strict_scan_finds_whole_local_paths_and_keeps_public_text(self):
         leaks = ["/private.png", "/Users/Private Name/image.png", "file:///Projects/My Scene/test.png",
                  "path:/data/private/a.png", "/@private/a.png", "//server/share/image.png",
-                 r"C:\Users\a\b.png", r"\\srv\share\a.png", "/Game/private/a.png"]
-        public = ["/Game/角色/T_Body", "/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo",
+                 r"C:\Users\a\b.png", r"\\srv\share\a.png", "/Game/private/a.png",
+                 "/Game/Private Name/image.png", "/Game/O'Brien/image.png"]
+        public = ["/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/Transient",
+                  "/Script/Engine.Texture2D", "/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo",
                   "https://example.com/a/b", "resource://shelf/preset?version=1",
                   "实时/立即/完整", "a / b", "1/2"]
         for value in leaks:
@@ -226,22 +228,24 @@ class SummaryTests(unittest.TestCase):
                 self.assertEqual(find_local_path_leaks([{"value": value}]), [])
                 self.assertEqual(sanitize_local_paths(value), value)
         self.assertEqual(sanitize_local_paths("error /Users/Private Name/image.png /Game/角色/T_Body"),
-                         "error <local path> /Game/角色/T_Body")
+                         "error <local path>")
 
-    def test_scanner_handles_apostrophes_spaces_and_adjacent_tokens(self):
+    def test_scanner_handles_apostrophes_spaces_and_adjacent_urls(self):
         redacted = {
             "/Game/Private O'Brien/image.png": "<local path>",
+            "/Game/O'Brien/image.png": "<local path>",
             "/Game/Private Name/image.png": "<local path>",
             "/Users/Artists' Files/image.png": "<local path>",
             "/Users/O'Brien/image.png": "<local path>",
+            "cannot open /Game/Private/image.png.": "cannot open <local path>.",
             "open '/Users/a/b.png'. Next": "open '<local path>'. Next",
+            "open '/Users/Artists' Files/image.png'. Next": "open '<local path>'. Next",
+            "open '/Users/a/b.png' and 'done'": "open '<local path>' and 'done'",
             "open '/Users/O'Brien/image.png', retry": "open '<local path>', retry",
-            "/private.png,/Game/Body/T,https://host/a.png":
-                "<local path>,/Game/Body/T,https://host/a.png",
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            "/private.png,/Game/Body/T,https://host/a.png": "<local path>,https://host/a.png",
         }
-        kept = ["/Game/角色/T_Body", "/Game/角色/T_Body /Game/Other/T_Other",
-                "/Game/角色/T_Body https://host/a.png", "实时/立即/完整", "a / b"]
+        kept = ["/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "实时/立即/完整", "a / b"]
         for value, expected in redacted.items():
             with self.subTest(value=value):
                 self.assertEqual(sanitize_local_paths(value), expected)

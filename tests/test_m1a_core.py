@@ -168,6 +168,23 @@ class NamingTests(unittest.TestCase):
         # Another Tile cannot be confused with the literal 1001, and distinct map types never clash.
         validate_binding_uniqueness(settings, templates, {"Body": [(1, 0)]})
 
+    def test_precheck_matches_the_runtime_regex_for_every_tile_number(self):
+        settings = config.parse_config({
+            "preset": "Demo", "target_dir": "t", "stage_dir": "s", "texture_sets": {"Body": {}}})
+        available = {"Body": [(0, 0)]}
+        spec = naming.TextureSetNaming("Body")
+        for templates in (["T_$textureSet_Base(_$udim)", "T_Body_Base_1002"],
+                          ["T_$textureSet_Base(_$colorSpace)_1002",
+                           "T_$textureSet_Base(_$colorSpace)(_$udim)"]):
+            for ordered in (templates, templates[::-1]):
+                with self.subTest(templates=ordered):
+                    with self.assertRaisesRegex(naming.NamingError, "can match the same exported file"):
+                        validate_binding_uniqueness(settings, ordered, available)
+        with self.assertRaisesRegex(naming.NamingError, "matches several preset templates"):
+            naming.final_name("T_Body_Base_1002.png", ["T_$textureSet_Base(_$udim)", "T_Body_Base_1002"],
+                              spec)
+        validate_binding_uniqueness(settings, ["T_$textureSet_Base(_$udim)", "T_Body_Other_1002"], available)
+
     def test_source_name_patterns_follow_export_names(self):
         def stems(template, name, udim):
             return {(p.prefix, p.suffix) for p in naming.source_name_patterns(template, name, udim)}
@@ -688,12 +705,11 @@ class PipelineTests(WorkspaceTest):
         path = self.root / "sanitize.jsonl"
         self.assertEqual(len(find_local_path_leaks([{"fields": paths}])), len(paths))
         SyncLogWriter(path).write("test", fields=paths, public=public,
-                                  message=f"failed at {paths[0]} for {public[0]} {public[3]}")
+                                  message=f"see {public[3]} failed at {paths[0]}")
         record = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(record["fields"], ["<local path>"] * len(paths))
         self.assertEqual(record["public"], public)
-        self.assertIn(public[0], record["message"])
-        self.assertIn(public[3], record["message"])
+        self.assertEqual(record["message"], f"see {public[3]} failed at <local path>")
         self.assertEqual(find_local_path_leaks([record]), [])
 
     def test_log_writer_and_strict_scan_distinguish_local_paths_from_public_tokens(self):
@@ -711,10 +727,10 @@ class PipelineTests(WorkspaceTest):
             "file:///C:/a.png": "<local path>",
             "/Game/private/a.uasset": "<local path>",
             "/Game/private/a.png": "<local path>",
-            "error /Users/Private Name/image.png /Game/角色/T_Body":
-                "error <local path> /Game/角色/T_Body",
+            "error /Users/Private Name/image.png /Game/角色/T_Body": "error <local path>",
         }
         public = ("/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo", "/Game/角色/T_Body",
+                  "/Game/StoU/T_Face.T_Face", "/Engine/Transient", "/Script/Engine.Texture2D",
                   "https://example.com/a/b", "resource://shelf/preset?version=1",
                   "实时/立即/完整", "a / b", "1/2")
         path = self.root / "path-boundaries.jsonl"
@@ -728,27 +744,33 @@ class PipelineTests(WorkspaceTest):
                 self.assertEqual(record["value"], paths.get(value, value))
                 self.assertEqual(find_local_path_leaks([record]), [])
 
-    def test_local_paths_with_spaces_apostrophes_and_adjacent_public_tokens(self):
+    def test_local_paths_with_spaces_apostrophes_and_adjacent_public_urls(self):
         from tools.summarize_sync_logs import find_local_path_leaks
 
         redacted = {
             "/Game/Private Name/image.png": "<local path>",
             "/Game/My Private Name/image.png": "<local path>",
+            "/Game/O'Brien/image.png": "<local path>",
+            "/Game/Private O'Brien/image.png": "<local path>",
             "/Users/O'Brien/image.png": "<local path>",
+            "/Users/Artists' Files/image.png": "<local path>",
+            "cannot open /Game/Private/image.png.": "cannot open <local path>.",
             "open '/Users/O'Brien/image.png', retry": "open '<local path>', retry",
             "open '/Users/a/b.png'": "open '<local path>'",
-            "/private.png,https://example.com/a": "<local path>,https://example.com/a",
-            "/Users/Private Name/image.png,/Game/角色/T_Body": "<local path>,/Game/角色/T_Body",
-            "/Game/Private O'Brien/image.png": "<local path>",
-            "/Users/Artists' Files/image.png": "<local path>",
             "open '/Users/a/b.png'. Next": "open '<local path>'. Next",
-            "/private.png,/Game/Body/T,https://host/a.png":
-                "<local path>,/Game/Body/T,https://host/a.png",
+            "open '/Users/Artists' Files/image.png'. Next": "open '<local path>'. Next",
+            "open '/Users/a/b.png' and 'done'": "open '<local path>' and 'done'",
+            "open '/Users/a/b.png' and '/Users/c/d.png'":
+                "open '<local path>' and '<local path>'",
+            "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            "/Users/Private Name/image.png,https://example.com/a":
+                "<local path>,https://example.com/a",
+            "/Game/角色/T_Body in /private.png": "<local path>",
         }
         kept = (
-            "实时/立即/完整", "a / b",
-            "/Game/角色/T_Body", "/Game/角色/T_Body /Game/Other/T_Other",
-            "/Game/角色/T_Body https://example.com/a", "/Game/角色/T_Body in https://example.com/a",
+            "实时/立即/完整", "a / b", "1/2",
+            "/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/Transient",
+            "/Script/Engine.Texture2D", "https://example.com/a/b",
         )
         path = self.root / "edges.jsonl"
         writer = SyncLogWriter(path)
@@ -760,8 +782,7 @@ class PipelineTests(WorkspaceTest):
                 self.assertEqual(sanitize_local_paths(value), redacted.get(value, value))
                 self.assertEqual(record["value"], redacted.get(value, value))
                 self.assertEqual(bool(find_local_path_leaks([{"value": value}])), value in redacted)
-        self.assertEqual(sanitize_local_paths("/Game/角色/T_Body in /private.png"),
-                         "/Game/角色/T_Body in <local path>")
+                self.assertEqual(find_local_path_leaks([record]), [])
 
     def test_stall_includes_validation_and_worker_submission_even_on_failure(self):
         engine, _ = self.engine()

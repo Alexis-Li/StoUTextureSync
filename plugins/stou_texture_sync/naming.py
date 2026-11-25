@@ -276,6 +276,32 @@ def source_name_patterns(template: str, texture_set: str, udim: int | None, *,
     return patterns
 
 
+def pattern_matches_template(emitted: FinalNamePattern, template: str, texture_set: str,
+                             current_udim: int | None) -> bool:
+    """Whether ``template`` would also accept a file stem ``emitted`` describes at run time.
+
+    A literal stem is checked with the very regex ``final_name`` applies, so every Tile number
+    the template accepts counts. A stem with a ``$colorSpace`` hole is compared with the
+    patterns of each Tile number it can contain.
+    """
+    if emitted.suffix is None:
+        rx = re.compile(template_regex(template, texture_set).pattern, re.IGNORECASE)
+        return rx.fullmatch(f"{emitted.prefix}.png") is not None
+    text = f"{emitted.prefix} {emitted.suffix}"
+    candidates: set[int | None] = {None, 1001, *(int(found) for found in re.findall(r"1\d{3}", text))}
+    if current_udim is not None:
+        candidates.add(current_udim)
+    for udim in candidates:
+        try:
+            accepted = source_name_patterns(template, texture_set, udim,
+                                            include_optional_udim_omit=True)
+        except NamingError:
+            continue
+        if any(patterns_overlap(emitted, pattern) for pattern in accepted):
+            return True
+    return False
+
+
 def final_name_patterns(template: str, naming: TextureSetNaming,
                         udim: int | None) -> list[FinalNamePattern]:
     """All final-stem patterns ``template`` can produce for one Texture Set and Tile."""
