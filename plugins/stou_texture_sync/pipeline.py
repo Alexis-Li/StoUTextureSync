@@ -12,13 +12,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import SyncConfig
-from .naming import NamingError, plan_names, udim_to_uv
+from .naming import NamingError, plan_names, preset_example_name, udim_to_uv, uv_to_udim
 from .publish import STAGE_MARKER, BatchResult, publish_batch
 from .scheduler import WHOLE, Batch, Scheduler
 from .target_lock import TargetLock
 
 STATUS_TEXT = {
-    "idle": "空闲", "unconfigured": "未配置", "waiting_idle": "等待空闲",
+    "idle": "空闲", "unconfigured": "未配置", "waiting_idle": "等待修改结束",
+    "host_busy": "Painter 正忙",
     "pending": "待同步", "exporting": "导出中", "publishing": "发布中",
     "file_published": "文件已发布", "partial_publication": "部分发布",
     "failed": "失败", "paused": "已暂停", "target_locked": "目标目录被占用",
@@ -26,11 +27,16 @@ STATUS_TEXT = {
     "stopped": "已停止",
 }
 
-# UE package names such as /Game/Textures/T_Body are virtual paths.
+# UE package names are virtual paths unless the suffix identifies a local file.
+_PUBLIC_PATH = (
+    r"(?:https?|resource)://[^\s\"'<>|]+|"
+    r"/(?:Game|Engine|Script)(?!/[^\s\"'<>|]*\.(?:png|spp|uproject|jsonl?)\b)"
+    r"(?:/[\w.-]+)+(?![\w./-])"
+)
 LOCAL_PATH_PATTERN = re.compile(
-    r"(?<![\w])(?:[A-Z]:[\\/]|\\\\|(?<![:/])/(?:Users|home|private|Volumes|tmp|var|mnt|"
-    r"media|opt|root|etc|srv|run|dev|proc|sys|bin|lib|lib64|usr|workspace|workspaces)(?:/|(?=$)))"
-    r"[^\r\n]*",
+    rf"(?<![\w])(?:(?P<public>{_PUBLIC_PATH})|"
+    rf"(?:file://|[A-Z]:[\\/]|\\\\(?=[^\\/\s]+\\)|~[/\\]|(?<![:/\\])/(?=[\w.-]))"
+    rf"(?:(?![ \t]+(?:{_PUBLIC_PATH}))[^\"'<>|\r\n])*)",
     re.IGNORECASE,
 )
 
@@ -44,9 +50,13 @@ def _basename(path) -> str:
     return re.split(r"[/\\]", os.fspath(path))[-1]
 
 
+def sanitize_local_paths(value: str) -> str:
+    return LOCAL_PATH_PATTERN.sub(lambda match: match["public"] or "<local path>", value)
+
+
 def _sanitize(value):
     if isinstance(value, str):
-        return LOCAL_PATH_PATTERN.sub("<local path>", value)
+        return sanitize_local_paths(value)
     if isinstance(value, dict):
         return {_sanitize(key): _sanitize(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -117,8 +127,24 @@ def validate_stage_paths(stage_dir: str, textures: dict) -> None:
             paths.add(key)
 
 
+def validate_binding_uniqueness(config, templates, available_tiles=None) -> None:
+    """Check final names across enabled bindings, including unchanged Tiles."""
+    namings, examples = {}, {}
+    for name, binding in config.texture_sets.items():
+        if not binding.enabled:
+            continue
+        namings[name] = binding.to_naming()
+        if available_tiles is not None and name in available_tiles:
+            udims = {uv_to_udim(u, v) for u, v in available_tiles[name]}
+        else:
+            udims = binding.tile_parts.keys() | binding.tile_size_log2.keys()
+        examples[name] = [preset_example_name(template, name, udim)
+                          for udim in (sorted(udims) or [None]) for template in templates]
+    plan_names(examples, templates, namings)
+
+
 def validate_export_and_plan(config, templates, stage_dir, export_status, export_message,
-                             planned_textures, actual_textures) -> ValidationOutcome:
+                             planned_textures, actual_textures, available_tiles=None) -> ValidationOutcome:
     if export_status != "Success":
         return ValidationOutcome("export_not_success", error=export_message or str(export_status))
     stage = Path(stage_dir).resolve()
@@ -145,6 +171,7 @@ def validate_export_and_plan(config, templates, stage_dir, export_status, export
         return ValidationOutcome("unexpected_outputs", not_written=not_written,
                                  unexpected=names, error=f"未确认的导出文件：{', '.join(names)}")
     try:
+        validate_binding_uniqueness(config, templates, available_tiles)
         namings = {name: spec.to_naming() for name, spec in config.texture_sets.items() if spec.enabled}
         names = plan_names(grouped, templates, namings)
     except NamingError as exc:
@@ -271,8 +298,11 @@ class SyncEngine:
                 self.on_status_changed(state, status)
 
     def _show_pending(self) -> None:
-        if self.scheduler.paused_reason is not None:
-            self._set_status("paused", self.scheduler.paused_reason)
+        reason = self.scheduler.paused_reason
+        if reason is not None:
+            recovery = ("请执行完整同步以恢复" if self.scheduler.requires_full_recovery
+                        else "请执行立即同步重试")
+            self._set_status("paused", f"{reason}。{recovery}")
         elif self.scheduler.has_pending():
             self._set_status("waiting_idle" if self.scheduler.enabled else "pending")
         else:
@@ -307,11 +337,11 @@ class SyncEngine:
         if self._closed or not self.scheduler.set_enabled(enabled):
             return False
         if not enabled:
+            self._pending_first = self._pending_last = None
+        if current and batch.trigger == "auto" and not enabled:
             self.worker.cancel()
-            if current and batch.scope:
-                self._restore_change_times(self._metrics)
             self._show_pending()
-        elif batch is None or not current:
+        elif not current:
             self._show_pending()
         return True
 
@@ -346,7 +376,7 @@ class SyncEngine:
 
     def submit_export_result(self, batch, *, preset_templates, stage_dir, export_status,
                              export_message, planned_textures, actual_textures, list_s,
-                             export_s, stall_ms, start_wall) -> ValidationOutcome | None:
+                             export_s, stall_ms, start_wall, available_tiles=None) -> ValidationOutcome | None:
         metrics = self._metrics
         if (self._closed or self.scheduler.running_batch() is not batch
                 or metrics is None or metrics.publishing):
@@ -359,19 +389,25 @@ class SyncEngine:
         start = time.perf_counter()
         outcome = validate_export_and_plan(
             self.config, preset_templates, stage_dir, export_status, export_message,
-            planned_textures, actual_textures)
+            planned_textures, actual_textures, available_tiles)
         metrics.validate_s = time.perf_counter() - start
         metrics.not_written = outcome.not_written
-        if outcome.outcome != "ready":
-            self._complete(batch, outcome.outcome, error=outcome.error)
-        elif outcome.staged:
+        submission_error = None
+        if outcome.outcome == "ready" and outcome.staged:
             try:
                 self.worker.submit(batch, outcome.staged)
             except (OSError, RuntimeError) as exc:
-                self._complete(batch, "failed", error=str(exc))
+                submission_error = str(exc)
             else:
                 metrics.publishing = True
-                self._set_status("publishing")
+        submit_ms = (time.perf_counter() - start) * 1000
+        metrics.stall_ms = round(max(stall_ms or 0, submit_ms), 3)
+        if outcome.outcome != "ready":
+            self._complete(batch, outcome.outcome, error=outcome.error)
+        elif submission_error is not None:
+            self._complete(batch, "failed", error=submission_error)
+        elif metrics.publishing:
+            self._set_status("publishing")
         else:
             self._complete(batch, "file_published")
         return outcome
@@ -382,17 +418,21 @@ class SyncEngine:
             return None
         batch, result = completion.batch, completion.result
         state = result.state
-        if completion.cancelled or not self.scheduler.is_current(batch):
+        # Cancellation cannot undo files that were already replaced.
+        if state != "partial_publication" and (completion.cancelled or not self.scheduler.is_current(batch)):
             state = "stale_during_publish"
         self._complete(batch, state, result=result, publish_s=completion.elapsed_s, error=result.error)
         return result
 
     def _restore_change_times(self, metrics: _BatchMetrics | None) -> None:
-        if metrics is not None:
-            if metrics.first_change_wall is not None:
-                self._pending_first = metrics.first_change_wall
-            if self._pending_last is None:
-                self._pending_last = metrics.last_change_wall
+        if metrics is None:
+            return
+        if metrics.first_change_wall is not None:
+            self._pending_first = (min(self._pending_first, metrics.first_change_wall)
+                                   if self._pending_first is not None else metrics.first_change_wall)
+        if metrics.last_change_wall is not None:
+            self._pending_last = (max(self._pending_last, metrics.last_change_wall)
+                                  if self._pending_last is not None else metrics.last_change_wall)
 
     def _complete(self, batch, outcome, *, result=None, publish_s=None, error="") -> None:
         current = self.scheduler.is_current(batch)
@@ -403,29 +443,27 @@ class SyncEngine:
         stale = outcome in ("stale_before_publish", "stale_during_publish")
         failed = outcome != "file_published" and not stale
         reason = {
-            "partial_publication": "请执行完整同步以恢复",
-            "target_locked": "目标目录有其他写入方",
-            "export_not_success": "Painter 导出未成功",
-            "unexpected_outputs": "导出文件与计划不符",
-            "naming_error": "文件命名或 Tile 映射无效",
-        }.get(outcome, "文件发布失败")
+            "partial_publication": "部分文件已发布",
+            "target_locked": "目标目录被占用，请等待其他写入方释放目标目录",
+            "export_not_success": "Painter 导出未成功，请检查预设和工程状态",
+            "unexpected_outputs": "导出文件与计划不符，请检查预设",
+            "naming_error": "文件命名或 Tile 映射无效，请修正配置",
+        }.get(outcome, "文件发布失败，请检查目标目录和写入权限")
         require_full = outcome == "partial_publication"
-        if failed and current and not batch.full and not require_full and metrics is not None:
+        if failed and current and not batch.full and not require_full:
             self._restore_change_times(metrics)
-        self.scheduler.finish(batch, failed=failed, pause_reason=reason,
+        self.scheduler.finish(batch, failed=failed or stale, pause_reason=reason,
                               require_full_recovery=require_full)
-        if current and not stale:
-            if failed:
-                state = outcome if outcome in STATUS_TEXT else "failed"
-                self._set_status(state, reason if state != "target_locked" else None)
-            else:
-                note = None if published_wall else "没有需要发布的文件"
-                self._set_status("file_published" if published_wall else "idle", note)
-                if self.scheduler.has_pending():
-                    self._show_pending()
+        if failed and (current or (require_full and self.scheduler.is_same_project(batch))):
+            self._show_pending()
+        elif outcome == "file_published" and current:
+            note = None if published_wall else "没有需要发布的文件"
+            self._set_status("file_published" if published_wall else "idle", note)
+            if self.scheduler.has_pending():
+                self._show_pending()
         if metrics is not None:
             self._write_batch(batch, metrics, outcome, publish_s, files, published_wall, error,
-                              self.scheduler.paused_reason if current else None)
+                              self.scheduler.paused_reason if self.scheduler.is_same_project(batch) else None)
 
     def _write_batch(self, batch, metrics, outcome, publish_s, files, published_wall, error, pause_reason):
         scope = (dict.fromkeys(name for name, spec in self.config.texture_sets.items() if spec.enabled)
@@ -442,7 +480,8 @@ class SyncEngine:
                 publish_s=publish_s, sp_side_s=(published_wall or time.time()) - last if last is not None else None,
                 stall_ms=metrics.stall_ms, not_written=[_basename(name) for name in metrics.not_written],
                 files=[{"name": _basename(file.name), "status": file.status, "sha": file.sha,
-                        "attempts": file.attempts, "size_bytes": file.size_bytes, "error": file.error}
+                        "attempts": file.attempts, "size_bytes": file.size_bytes, "error": file.error,
+                        "published_at": file.published_at if file.status == "published" else None}
                        for file in files],
                 pause_reason=pause_reason, error=error,
             )

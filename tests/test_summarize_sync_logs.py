@@ -94,6 +94,47 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(info["e2e_s"]["max"], 4)
         self.assertEqual(info["target"], {"pass": 1, "fail": 0, "measured": 1, "unmatched": 1})
 
+    def test_each_file_matches_from_its_own_publication_time(self):
+        batch_record = batch(12.0, 9.0, [("T_Body.png", "published"), ("T_Arm.png", "published")])
+        for file, wall in zip(batch_record["files"], (10.0, 12.0)):
+            file["published_at"] = wall
+        events = [{"kind": "reimport", "wall": 11.0, "asset": "T_Body"},
+                  {"kind": "reimport", "wall": 13.5, "asset": "T_Arm"}]
+        info = summarize([batch_record], events)["samples"]["default"]
+        self.assertEqual(info["target"]["unmatched"], 0)
+        self.assertEqual(info["ue_reimport_s"]["max"], 1.5)
+
+    def test_duplicate_receipt_does_not_confirm_a_changed_file(self):
+        name = "T_Body.png"
+        first = batch(10, 9, [(name, "published")], sample="body")
+        second = batch(20, 19, [(name, "published")], sample="body")
+        first["files"][0]["sha"] = "sha_1"
+        second["files"][0]["sha"] = "sha_2"
+        events = [{"kind": "reimport", "wall": 11, "asset": "T_Body", "registry_md5": "M1"},
+                  {"kind": "reimport", "wall": 21, "asset": "/Game/Test/T_Body.T_Body",
+                   "registry_md5": ["M1"]},
+                  {"kind": "reimport", "wall": 23, "asset": "T_Body", "registry_md5": "M2"}]
+        info = summarize([first, second], events)["samples"]["body"]
+        self.assertEqual(info["ue_reimport_s"], {"n": 2, "median": 2, "p95": 3, "max": 3})
+        info = summarize([first, second], events[:2])["samples"]["body"]
+        self.assertEqual(info["target"]["unmatched"], 1)
+        self.assertEqual(info["ue_reimport_s"]["max"], 1)
+        del events[1]["registry_md5"]
+        info = summarize([first, second], events[:2])["samples"]["body"]
+        self.assertEqual(info["target"]["unmatched"], 1)
+
+    def test_receipts_are_isolated_by_sample_for_the_same_asset(self):
+        first = batch(10, 9, [("T_Body.png", "published")], sample="A")
+        second = batch(11, 10, [("T_Body.png", "published")], sample="B")
+        event = {"kind": "reimport", "wall": 12, "asset": "T_Body", "sample": "A"}
+        samples = summarize([first, second], [event])["samples"]
+        self.assertEqual(samples["A"]["ue_reimport_s"]["max"], 2)
+        self.assertEqual(samples["A"]["target"]["unmatched"], 0)
+        self.assertEqual(samples["B"]["target"]["unmatched"], 1)
+        del event["sample"]
+        samples = summarize([first, second], [event])["samples"]
+        self.assertEqual([samples[sample]["target"]["unmatched"] for sample in ("A", "B")], [1, 1])
+
     def test_strict_sanitize_checks_nested_keys_and_values_without_echoing_paths(self):
         clean = {"kind": "batch", "sample": "clean", "path": "/Game/StoU/T_Test"}
         leaks = {"kind": "batch", "sample": "/Users/Private Name/project",

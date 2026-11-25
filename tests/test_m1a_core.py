@@ -1,5 +1,6 @@
 """M1a scheduling, source-image publication and diagnostic contracts."""
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -9,11 +10,14 @@ import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock, patch
 
+from plugins import stou_texture_sync as plugin
 from plugins.stou_texture_sync import config, naming, publish
 from plugins.stou_texture_sync.pipeline import (
-    PublishWorker, SyncEngine, build_export_configs, format_status, validate_export_and_plan,
+    PublishWorker, SyncEngine, SyncLogWriter, build_export_configs, format_status,
+    validate_export_and_plan,
 )
 from plugins.stou_texture_sync.scheduler import Batch, Scheduler
 from plugins.stou_texture_sync.target_lock import LOCK_NAME, LockBusy, TargetLock
@@ -156,20 +160,53 @@ class SchedulerTests(unittest.TestCase):
         later = scheduler.next_batch(3)
         self.assertEqual(later.scope, {"Body": {(2, 0)}})
 
-    def test_disable_keeps_scope_and_manual_does_not_enable_auto(self):
+    def test_disable_discards_pending_scope_and_queued_requests(self):
+        for trigger in (None, "immediate", "full"):
+            with self.subTest(trigger=trigger):
+                scheduler = Scheduler(enabled=True, project_id="a")
+                scheduler.record("Body", (0, 0), 1)
+                if trigger is not None:
+                    self.assertTrue(getattr(scheduler, f"request_{trigger}")()[0])
+                self.assertTrue(scheduler.set_enabled(False))
+                self.assertEqual(scheduler.pending(), {})
+                self.assertFalse(scheduler.has_pending())
+                self.assertIsNone(scheduler.next_batch(10))
+                self.assertFalse(scheduler.request_immediate()[0])
+                scheduler.set_enabled(True)
+                self.assertIsNone(scheduler.next_batch(11))
+
+    def test_disable_discards_running_auto_scope_and_records_new_changes(self):
         scheduler = Scheduler(enabled=True, project_id="a")
         scheduler.record("Body", (0, 0), 1)
         running = scheduler.next_batch(2)
+        scheduler.record("Clothes", None, 3)
         self.assertTrue(scheduler.set_enabled(False))
         self.assertFalse(scheduler.is_current(running))
+        self.assertEqual(scheduler.generation, running.generation)
+        self.assertTrue(scheduler.record("Body", (1, 0), 4))
         scheduler.finish(running, failed=True)
         self.assertIsNone(scheduler.paused_reason)
+        self.assertEqual(scheduler.pending(), {"Body": {(1, 0)}})
         self.assertIsNone(scheduler.next_batch(10))
         self.assertEqual(scheduler.request_immediate(), (True, None))
         manual = scheduler.next_batch(10)
-        self.assertEqual((manual.trigger, manual.scope), ("immediate", {"Body": {(0, 0)}}))
+        self.assertEqual((manual.trigger, manual.scope), ("immediate", {"Body": {(1, 0)}}))
         scheduler.finish(manual)
         self.assertFalse(scheduler.enabled)
+
+    def test_realtime_toggle_preserves_running_manual_batches(self):
+        for trigger in ("immediate", "full"):
+            with self.subTest(trigger=trigger):
+                scheduler = Scheduler(enabled=True, project_id="a")
+                scheduler.record("Body", (0, 0), 1)
+                self.assertTrue(getattr(scheduler, f"request_{trigger}")()[0])
+                batch = scheduler.next_batch(2)
+                self.assertEqual(batch.trigger, trigger)
+                scheduler.set_enabled(False)
+                self.assertTrue(scheduler.is_current(batch))
+                self.assertEqual(scheduler.generation, batch.generation)
+                scheduler.finish(batch)
+                self.assertFalse(scheduler.requires_full_recovery)
 
     def test_project_change_discards_queued_work_and_stale_failure(self):
         scheduler = Scheduler(enabled=True, project_id="a")
@@ -207,6 +244,22 @@ class SchedulerTests(unittest.TestCase):
         self.assertTrue(full.full)
         self.assertEqual(full.trigger, "full")
         self.assertFalse(scheduler.has_pending())
+        self.assertTrue(scheduler.requires_full_recovery)
+        self.assertEqual(scheduler.paused_reason, "partial")
+        scheduler.record("Body", (1, 0), 33)
+        self.assertFalse(scheduler.request_immediate()[0])
+        scheduler.finish(full, failed=True, pause_reason="export failed")
+        self.assertTrue(scheduler.requires_full_recovery)
+        self.assertFalse(scheduler.request_immediate()[0])
+        self.assertIsNone(scheduler.next_batch(34))
+
+        scheduler.request_full()
+        recovery = scheduler.next_batch(34)
+        scheduler.record("Body", (2, 0), 35)
+        scheduler.finish(recovery)
+        self.assertFalse(scheduler.requires_full_recovery)
+        self.assertIsNone(scheduler.paused_reason)
+        self.assertTrue(scheduler.request_immediate()[0])
 
 
 class TargetAndPublishTests(WorkspaceTest):
@@ -306,11 +359,11 @@ class PipelineTests(WorkspaceTest):
         path.write_bytes(stem.encode())
         return str(path)
 
-    def submit(self, engine, batch, actual, planned=None, status="Success", message=""):
+    def submit(self, engine, batch, actual, planned=None, status="Success", message="", **kwargs):
         return engine.submit_export_result(
             batch, preset_templates=[TEMPLATE, "T_$textureSet_Normal"], stage_dir=self.stage,
             export_status=status, export_message=message, planned_textures=actual if planned is None else planned,
-            actual_textures=actual, list_s=0.02, export_s=0.2, stall_ms=31, start_wall=time.time())
+            actual_textures=actual, list_s=0.02, export_s=0.2, stall_ms=31, start_wall=time.time(), **kwargs)
 
     def wait_result(self, engine):
         deadline = time.monotonic() + 4
@@ -361,10 +414,11 @@ class PipelineTests(WorkspaceTest):
                          ("stou.sync.v1", "clothing", {"Clothes": "whole"}))
         self.assertEqual(record["not_written"], [optional.name])
         self.assertEqual(record["first_change_wall"], wall)
-        self.assertEqual(record["stall_ms"], 31)
+        self.assertGreaterEqual(record["stall_ms"], 31)
         self.assertEqual(record["files"][0]["name"], Path(color[("Clothes", "")][0]).name)
         self.assertEqual(len(record["files"][0]["sha"]), 64)
         self.assertGreater(record["published_wall"], record["start_wall"])
+        self.assertEqual(record["files"][0]["published_at"], record["published_wall"])
         self.assertNotIn(str(self.root), raw.decode())
 
     def test_export_blocks_unexpected_paths_names_and_failure(self):
@@ -388,7 +442,91 @@ class PipelineTests(WorkspaceTest):
         self.assertIn("<local path>", raw)
         self.assertNotIn("Private Assets", raw)
         self.assertNotIn("/Users/", raw)
+        self.assertTrue(engine.status_text.startswith("已暂停"))
+        self.assertIn("Painter 导出未成功", engine.status_text)
+        self.assertIn("完整同步", engine.status_text)
+        self.assertNotIn("立即同步", engine.status_text)
         self.assertFalse(list(self.target.iterdir()))
+
+    def test_single_tile_export_rejects_binding_wide_collision(self):
+        engine, _ = self.engine(enabled=True)
+        engine.record_texture_change("Clothes", (0, 0), 1, 10)
+        batch = engine.begin_next_batch(2)
+        path = self.stage / "T_Clothes_Albedo_1001.png"
+        path.write_bytes(b"first tile")
+        outputs = {"Clothes": [str(path)]}
+        outcome = engine.submit_export_result(
+            batch, preset_templates=[TEMPLATE], stage_dir=self.stage,
+            export_status="Success", export_message="", planned_textures=outputs,
+            actual_textures=outputs, list_s=0, export_s=0, stall_ms=0,
+            start_wall=12, available_tiles={"Clothes": [(0, 0), (1, 0)]})
+        self.assertEqual(outcome.outcome, "naming_error")
+        self.assertIn("1002", outcome.error)
+        self.assertTrue(engine.status_text.startswith("已暂停"))
+        self.assertIn("立即同步", engine.status_text)
+        self.assertNotIn("完整同步", engine.status_text)
+        self.assertFalse(list(self.target.iterdir()))
+
+        settings = config.parse_config(self.settings(texture_sets={
+            "Clothes": {"strip_tile_suffix": False},
+        }))
+        ready = validate_export_and_plan(settings, [TEMPLATE], self.stage, "Success", "",
+                                         outputs, outputs, {"Clothes": [(0, 0), (1, 0)]})
+        self.assertEqual(ready.staged, {path.name: str(path)})
+
+    def test_configured_tiles_detect_collisions_across_texture_sets(self):
+        settings = config.parse_config(self.settings(texture_sets={
+            "Body": {"mode": "body_part", "tile_parts": {"1001": "Torso"}},
+            "Clothes": {"mode": "body_part", "tile_parts": {"1002": "Torso"}},
+        }))
+        path = self.stage / "T_Body_Albedo_1001.png"
+        path.write_bytes(b"body tile")
+        outputs = {"Body": [str(path)]}
+        outcome = validate_export_and_plan(settings, [TEMPLATE], self.stage, "Success", "",
+                                           outputs, outputs)
+        self.assertEqual(outcome.outcome, "naming_error")
+        self.assertIn("T_Torso_Albedo", outcome.error)
+        self.assertIn("Clothes", outcome.error)
+
+        settings.texture_sets["Clothes"].enabled = False
+        ready = validate_export_and_plan(settings, [TEMPLATE], self.stage, "Success", "",
+                                         outputs, outputs)
+        self.assertEqual(ready.staged, {"T_Torso_Albedo.png": str(path)})
+
+    def test_log_writer_and_strict_scan_share_path_rules(self):
+        from tools.summarize_sync_logs import find_local_path_leaks
+
+        paths = ["/data/private/a.png", "/work/asset.spp", r"C:\Users\x\a.png",
+                 r"\\srv\share\a.png", "file:///C:/a.png", "~/project/image.png",
+                 "/Game/private/a.png", "/Engine/private/project.uproject",
+                 "/Script/private/log.jsonl"]
+        public = ["/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo",
+                  "/Engine/Transient", "/Script/Engine.Texture2D",
+                  "https://example.com/a/b", "http://example.com/private.spp",
+                  "resource://library/resources/a"]
+        path = self.root / "sanitize.jsonl"
+        self.assertEqual(len(find_local_path_leaks([{"fields": paths}])), len(paths))
+        SyncLogWriter(path).write("test", fields=paths, public=public,
+                                  message=f"failed at {paths[0]} for {public[0]} {public[3]}")
+        record = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(record["fields"], ["<local path>"] * len(paths))
+        self.assertEqual(record["public"], public)
+        self.assertIn(public[0], record["message"])
+        self.assertIn(public[3], record["message"])
+        self.assertEqual(find_local_path_leaks([record]), [])
+
+    def test_stall_includes_validation_and_worker_submission_even_on_failure(self):
+        engine, _ = self.engine()
+        engine.request_full_sync()
+        batch = engine.begin_next_batch(2)
+        outputs = {"Clothes": [self.staged()]}
+        with (patch.object(engine.worker, "submit", side_effect=RuntimeError("worker unavailable")),
+              patch("plugins.stou_texture_sync.pipeline.time.perf_counter", side_effect=[2, 2.02, 2.07])):
+            self.submit(engine, batch, outputs)
+        record = json.loads(Path(engine.config.log_path).read_text(encoding="utf-8"))
+        self.assertEqual(record["outcome"], "failed")
+        self.assertAlmostEqual(record["validate_s"], 0.02)
+        self.assertEqual(record["stall_ms"], 70)
 
     def test_background_permission_retries_and_partial_recovery(self):
         background_calls = []
@@ -409,8 +547,107 @@ class PipelineTests(WorkspaceTest):
         self.assertEqual(result.state, "partial_publication")
         self.assertEqual(background_calls, [True, True, True])
         self.assertTrue(engine.scheduler.requires_full_recovery)
+        status = engine.status_text
+        self.assertTrue(status.startswith("已暂停"))
+        self.assertIn("部分文件已发布", status)
+        self.assertIn("完整同步", status)
+        self.assertNotIn("立即同步", status)
+        engine.set_realtime_enabled(False)
+        self.assertEqual(engine.status_text, status)
         self.assertFalse(engine.request_immediate_sync()[0])
         self.assertTrue(engine.request_full_sync()[0])
+        self.submit(engine, engine.begin_next_batch(3), {}, status="Error")
+        self.assertTrue(engine.scheduler.requires_full_recovery)
+        self.assertTrue(engine.status_text.startswith("已暂停"))
+        self.assertIn("Painter 导出未成功", engine.status_text)
+        self.assertIn("完整同步", engine.status_text)
+
+    def test_target_lock_status_explains_recovery(self):
+        for full in (False, True):
+            with self.subTest(full=full):
+                engine, _ = self.engine(enabled=True)
+                if full:
+                    engine.request_full_sync()
+                else:
+                    engine.record_texture_change("Clothes", None, 0, 10)
+                target_lock = TargetLock(self.target)
+                target_lock.acquire("other writer")
+                try:
+                    self.submit(engine, engine.begin_next_batch(1), {"Clothes": [self.staged()]})
+                    self.assertEqual(self.wait_result(engine).state, "target_locked")
+                finally:
+                    target_lock.release()
+                self.assertTrue(engine.status_text.startswith("已暂停"))
+                self.assertIn("释放目标目录", engine.status_text)
+                self.assertIn("完整同步" if full else "立即同步", engine.status_text)
+                self.assertNotIn("立即同步" if full else "完整同步", engine.status_text)
+                self.assertNotIn("UE", engine.status_text)
+                self.assertEqual(engine.scheduler.requires_full_recovery, full)
+                self.assertEqual(engine.request_immediate_sync()[0], not full)
+
+    def test_realtime_toggle_does_not_cancel_manual_worker(self):
+        entered, proceed = threading.Event(), threading.Event()
+
+        def replace(temp, target):
+            entered.set()
+            if not proceed.wait(3):
+                raise RuntimeError("publication test did not release worker")
+            os.replace(temp, target)
+
+        engine, _ = self.engine(replace=replace, enabled=True)
+        engine.request_full_sync()
+        batch = engine.begin_next_batch(0)
+        self.submit(engine, batch, {"Clothes": [self.staged(), self.staged("Normal")]})
+        try:
+            self.assertTrue(entered.wait(2))
+            self.assertTrue(engine.set_realtime_enabled(False))
+            self.assertTrue(engine.scheduler.is_current(batch))
+        finally:
+            proceed.set()
+        self.assertEqual(self.wait_result(engine).state, "file_published")
+        self.assertEqual(engine.state, "file_published")
+        self.assertFalse(engine.scheduler.requires_full_recovery)
+
+    def test_cancel_mid_publish_keeps_partial_result_and_limits_recovery_to_its_project(self):
+        for switch_project in (False, True):
+            with self.subTest(switch_project=switch_project), TemporaryDirectory(dir=self.root) as sandbox:
+                locked = threading.Event()
+                scratch = Path(sandbox)
+                target = scratch / "target"
+                target.mkdir()
+
+                def replace(temp, destination):
+                    if Path(destination).name.endswith("_Normal.png"):
+                        locked.set()
+                        raise PermissionError("source busy")
+                    os.replace(temp, destination)
+
+                engine, _ = self.engine(replace=replace, enabled=True, target_dir=str(target),
+                                        log_path=str(scratch / "sync.jsonl"), publish_retry_delay_s=30)
+                engine.record_texture_change("Clothes", (0, 0), 1, 10)
+                batch = engine.begin_next_batch(2)
+                self.submit(engine, batch, {"Clothes": [self.staged(), self.staged("Normal")]})
+                self.assertTrue(locked.wait(2))
+                if switch_project:
+                    engine.on_project_changed("project-b")
+                else:
+                    engine.set_realtime_enabled(False)
+                self.assertEqual(self.wait_result(engine).state, "partial_publication")
+                record = json.loads(Path(engine.config.log_path).read_text(encoding="utf-8"))
+                self.assertEqual(record["outcome"], "partial_publication")
+                self.assertIsNotNone(record["files"][0]["published_at"])
+                self.assertIsNone(record["files"][1]["published_at"])
+                self.assertFalse(list(target.glob("*.stou-tmp")))
+                self.assertEqual(engine.scheduler.requires_full_recovery, not switch_project)
+                if switch_project:
+                    self.assertIsNone(engine.scheduler.paused_reason)
+                    self.assertEqual(engine.state, "idle")
+                else:
+                    self.assertEqual(engine.state, "paused")
+                    self.assertIn("完整同步", engine.status_text)
+                    self.assertFalse(engine.request_immediate_sync()[0])
+                    engine.request_full_sync()
+                    self.assertTrue(engine.scheduler.requires_full_recovery)
 
     def test_project_switch_wakes_worker_and_cannot_pause_new_project(self):
         waiting = threading.Event()
@@ -434,3 +671,143 @@ class PipelineTests(WorkspaceTest):
         self.assertEqual(json.loads(Path(engine.config.log_path).read_text(encoding="utf-8"))["outcome"],
                          "stale_during_publish")
         self.assertEqual(engine.state, "idle")
+
+
+class PainterControllerTests(WorkspaceTest):
+    def setUp(self):
+        super().setUp()
+        package = plugin.__name__
+        painter = ModuleType("substance_painter")
+        painter.__path__ = []
+        modules = {painter.__name__: painter}
+        for name in ("event", "export", "project", "textureset", "ui"):
+            module = Mock()
+            setattr(painter, name, module)
+            modules[f"substance_painter.{name}"] = module
+        self.painter = painter
+        self.qt = SimpleNamespace(
+            QObject=object, QTimer=Mock(), QCoreApplication=Mock(),
+            QEventLoop=SimpleNamespace(ProcessEventsFlag=SimpleNamespace(AllEvents=0)),
+            Qt=SimpleNamespace(TimerType=SimpleNamespace(PreciseTimer=0)),
+        )
+        modules["PySide6"] = SimpleNamespace(QtCore=self.qt)
+        modules[f"{package}.panel"] = SimpleNamespace(SyncPanel=Mock())
+        self.enterContext(patch.dict(sys.modules, modules))
+        spec = importlib.util.spec_from_file_location(
+            f"{package}.host_painter", Path(config.__file__).with_name("host_painter.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        sys.modules[spec.name] = module
+
+        painter.project.get_uuid.return_value = "project-a"
+        painter.project.is_busy.return_value = False
+        painter.textureset.all_texture_sets.return_value = []
+        painter.export.list_project_textures.side_effect = self._list
+        painter.export.export_project_textures.side_effect = self._export
+        settings = config.parse_config(self.settings(enabled=True, throttle_ms=None))
+        self.enterContext(patch.object(plugin, "_STATE", SimpleNamespace(config_override=settings)))
+        self.addCleanup(plugin.close_plugin)
+        plugin.start_plugin()
+        self.controller = plugin.get_controller()
+        self.controller._resolve_preset = Mock(return_value=("resource://Demo", [TEMPLATE]))
+        self.controller._refresh_project()
+
+    def _list(self, export_config):
+        path = Path(export_config["exportPath"]) / "T_Clothes_Albedo.png"
+        return {("Clothes", ""): [str(path)]}
+
+    def _export(self, export_config):
+        outputs = self._list(export_config)
+        Path(outputs["Clothes", ""][0]).write_bytes(b"texture")
+        status = self.painter.export.ExportStatus.Success
+        status.name = "Success"
+        return SimpleNamespace(status=status, message="", textures=outputs)
+
+    def test_queued_toggle_runs_before_submit_and_tick_cannot_reenter(self):
+        controller = self.controller
+        texture_set = self.painter.textureset.Stack.return_value.material.return_value
+        texture_set.name.return_value = "Clothes"
+        texture_set.has_uv_tiles.return_value = True
+        controller.engine.record_texture_change("Clothes", None, 1, 10)
+        batch = controller.engine.begin_next_batch(2)
+        controller.engine.record_texture_change("Clothes", (1, 0), 3, 12)
+        controller._on_texture(SimpleNamespace(stack_id=1, tile_indices=(2, 0)))
+
+        def process_events(_flags):
+            self.assertFalse(controller._in_export_call)
+            self.assertIs(controller._pending_submission[0], batch)
+            controller.set_realtime_enabled(False)
+            controller._tick()
+            self.assertIs(controller.engine.scheduler.running_batch(), batch)
+
+        self.qt.QCoreApplication.processEvents.side_effect = process_events
+        with patch.object(controller.engine.worker, "submit") as submit:
+            controller._run_export(batch)
+            submit.assert_not_called()
+        self.qt.QCoreApplication.processEvents.assert_called_once()
+        self.painter.export.export_project_textures.assert_called_once()
+        self.assertIsNone(controller._pending_submission)
+        record = json.loads(Path(controller.config.log_path).read_text(encoding="utf-8"))
+        self.assertEqual(record["outcome"], "stale_before_publish")
+        controller._tick()
+        self.assertEqual(controller.engine.scheduler.pending(), {})
+        self.assertFalse(controller.request_immediate_sync()[0])
+        with patch("plugins.stou_texture_sync.host_painter.time.time", return_value=14):
+            controller._on_texture(SimpleNamespace(stack_id=1, tile_indices=(3, 0)))
+        controller._tick()
+        self.assertTrue(controller.request_immediate_sync()[0])
+        manual = controller.engine.begin_next_batch(4)
+        self.assertEqual((manual.trigger, manual.scope), ("immediate", {"Clothes": {(3, 0)}}))
+        self.assertEqual((controller.engine._metrics.first_change_wall,
+                          controller.engine._metrics.last_change_wall), (14, 14))
+        self.assertFalse(list(self.target.iterdir()))
+
+    def test_queued_project_switch_discards_old_export(self):
+        controller = self.controller
+        self.assertTrue(controller.request_full_sync()[0])
+        batch = controller.engine.begin_next_batch(0)
+
+        def switch(_flags):
+            controller._on_project_left(None)
+            self.painter.project.get_uuid.return_value = "project-b"
+            controller._on_project_ready(None)
+
+        self.qt.QCoreApplication.processEvents.side_effect = switch
+        with patch.object(controller.engine.worker, "submit") as submit:
+            controller._run_export(batch)
+            submit.assert_not_called()
+        self.assertEqual(controller.engine.scheduler.project_id, "project-b")
+        self.assertIsNone(controller.engine.scheduler.paused_reason)
+        self.assertFalse(list(self.target.iterdir()))
+
+    def test_close_and_restart_discard_pending_submission(self):
+        old = self.controller
+        old.request_full_sync()
+        batch = old.engine.begin_next_batch(0)
+        dispatcher = self.painter.event.DISPATCHER
+        registered = dispatcher.connect.call_count
+
+        def restart(_flags):
+            stage = Path(old._pending_submission[1]["stage_dir"])
+            self.assertTrue(stage.is_dir())
+            plugin.close_plugin()
+            self.assertFalse(stage.exists())
+            plugin.start_plugin()
+
+        self.qt.QCoreApplication.processEvents.side_effect = restart
+        with patch.object(old.engine, "submit_export_result") as submit:
+            old._run_export(batch)
+            submit.assert_not_called()
+        self.assertIsNone(old._pending_submission)
+        self.assertIsNot(plugin.get_controller(), old)
+        self.assertEqual(dispatcher.disconnect.call_count, registered)
+        self.assertEqual(dispatcher.connect.call_count, 2 * registered)
+        self.assertFalse(list(self.target.iterdir()))
+
+    def test_waiting_for_edits_and_host_busy_have_distinct_statuses(self):
+        controller = self.controller
+        controller.engine.record_texture_change("Clothes", None, time.perf_counter(), 10)
+        self.assertEqual(controller.engine.status_text, "等待修改结束")
+        controller._busy = True
+        controller._tick()
+        self.assertEqual(controller.panel.set_status.call_args.args[0], "待同步：Painter 正忙")

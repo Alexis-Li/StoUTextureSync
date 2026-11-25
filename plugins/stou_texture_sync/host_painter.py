@@ -38,7 +38,8 @@ class PainterSyncController(QtCore.QObject):
         self._qt_connections = []
         self._previous_throttle = None
         self._stage_root = None
-        self._export_running = False
+        self._in_export_call = False
+        self._pending_submission = None
         self._export_gap = 0.0
         self._last_beat = time.perf_counter()
         self._idle_until = None
@@ -163,8 +164,8 @@ class PainterSyncController(QtCore.QObject):
     def set_realtime_enabled(self, enabled: bool) -> None:
         if self._closed or self.engine is None:
             return
-        if not enabled:
-            self.engine.set_realtime_enabled(False)
+        if not enabled and self.engine.set_realtime_enabled(False):
+            self._changes.clear()
         try:
             self._apply_throttle(enabled)
         except (ValueError, RuntimeError, OverflowError):
@@ -192,18 +193,18 @@ class PainterSyncController(QtCore.QObject):
         return self._manual_request(full=True)
 
     def _tick(self) -> None:
-        if self._closed:
+        if self._closed or self._in_export_call or self._pending_submission is not None:
             return
         self._refresh_project()
         self.engine.poll_publish_result()
-        if self._export_running or self.engine.scheduler.project_id is None:
+        if self.engine.scheduler.project_id is None:
             self.panel.set_status(self._status)
             return
         self._drain_changes()
         self.panel.set_status(self._status)
         if self._busy or not sp.project.is_in_edition_state() or sp.project.is_busy():
             if self.engine.scheduler.has_pending() and not self.engine.scheduler.paused_reason:
-                self.panel.set_status(format_status("waiting_idle", "Painter 正忙"))
+                self.panel.set_status(format_status("pending", format_status("host_busy")))
             return
         if self._idle_until is not None:
             return
@@ -216,10 +217,11 @@ class PainterSyncController(QtCore.QObject):
         now = time.perf_counter()
         gap = (now - self._last_beat) * 1000
         self._last_beat = now
-        if self._export_running:
+        export_active = self._in_export_call or self._pending_submission is not None
+        if export_active:
             self._export_gap = max(self._export_gap, gap)
         if self._idle_until is not None and self._idle_samples is not None:
-            if (not self._busy and not self._export_running and not self._changes
+            if (not self._busy and not export_active and not self._changes
                     and self.engine.scheduler.running_batch() is None):
                 self._idle_samples.append(gap)
             if now >= self._idle_until:
@@ -255,13 +257,13 @@ class PainterSyncController(QtCore.QObject):
         return preset.resource_id.url(), [output["fileName"] for output in preset.list_output_maps()]
 
     def _run_export(self, batch) -> None:
-        self._export_running = True
+        self._in_export_call = True
         self._export_gap = 0.0
         start_wall = time.time()
         self._last_beat = time.perf_counter()
         payload = dict(preset_templates=[], stage_dir="", export_status="Success", export_message="",
                        planned_textures={}, actual_textures={}, list_s=0.0, export_s=0.0,
-                       start_wall=start_wall)
+                       start_wall=start_wall, available_tiles=None)
         try:
             if self._stage_root is None:
                 root = Path(self.config.stage_dir)
@@ -269,7 +271,7 @@ class PainterSyncController(QtCore.QObject):
                 self._stage_root = tempfile.mkdtemp(prefix="painter-", dir=root)
             stage = payload["stage_dir"] = prepare_stage_dir(self._stage_root)
             url, payload["preset_templates"] = self._resolve_preset()
-            available_tiles = {
+            available_tiles = payload["available_tiles"] = {
                 ts.name(): [(tile.u, tile.v) for tile in ts.all_uv_tiles()] if ts.has_uv_tiles() else []
                 for ts in sp.textureset.all_texture_sets()
             }
@@ -298,18 +300,28 @@ class PainterSyncController(QtCore.QObject):
         except Exception as exc:
             payload["export_status"] = "Error"
             payload["export_message"] = str(exc)
-        # Qt can deliver a last heartbeat after the blocking export call returns.
-        QtCore.QTimer.singleShot(0, lambda: self._submit_export(batch, payload))
+        finally:
+            self._in_export_call = False
+            if self._closed:
+                self.close()
+        if self._closed:
+            return
+        self._pending_submission = batch, payload
+        # Deliver queued project and switch events before testing batch validity.
+        self._drain_ui_events()
+        submission, self._pending_submission = self._pending_submission, None
+        if submission is not None:
+            self._submit_export(*submission)
+
+    def _drain_ui_events(self) -> None:
+        QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents)
 
     def _submit_export(self, batch, payload) -> None:
         gap = (time.perf_counter() - self._last_beat) * 1000
-        self._export_running = False
-        if self._closed:
-            self._clear_staging()
-            return
         self._refresh_project()
         self.engine.submit_export_result(batch, **payload, stall_ms=round(max(gap, self._export_gap), 3))
-        self.panel.set_status(self._status)
+        if not self._closed:
+            self.panel.set_status(self._status)
 
     def _clear_staging(self) -> None:
         if self._stage_root is not None:
@@ -331,6 +343,7 @@ class PainterSyncController(QtCore.QObject):
                     _LOG.exception("Could not disconnect Painter event %s", event_type.__name__)
             self._handlers.clear()
             self._changes.clear()
+            self._pending_submission = None
             self._idle_until = None
         stopped = self.engine is None or self.engine.close()
         try:
@@ -339,6 +352,6 @@ class PainterSyncController(QtCore.QObject):
             if self.dock is not None:
                 sp.ui.delete_ui_element(self.dock)
                 self.dock = None
-        if stopped and not self._export_running:
+        if stopped and not self._in_export_call:
             self._clear_staging()
-        return stopped and not self._export_running
+        return stopped and not self._in_export_call

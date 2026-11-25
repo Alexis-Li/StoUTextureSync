@@ -76,6 +76,19 @@ def uv_to_udim(u: int, v: int) -> int:
     return 1001 + u + 10 * v
 
 
+def preset_example_name(template: str, texture_set: str, udim: int | None) -> str:
+    """Instantiate the template for a binding-wide collision check."""
+    template_regex(template, texture_set)
+    tokens = {"textureSet": texture_set, "colorSpace": "sRGB",
+              "udim": str(udim) if udim is not None else ""}
+    if udim is None:
+        template = re.sub(r"\([^()]*\$udim[^()]*\)", "", template)
+        if "$udim" in template:
+            raise NamingError(f"{texture_set}: the preset requires a Tile suffix")
+    template = template.replace("(", "").replace(")", "")
+    return re.sub(r"\$([A-Za-z]+)", lambda match: tokens[match[1]], template) + ".png"
+
+
 @dataclass
 class TextureSetNaming:
     """Naming configuration of one bound Texture Set."""

@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from pathlib import Path, PurePosixPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from plugins.stou_texture_sync.pipeline import LOCAL_PATH_PATTERN  # noqa: E402
+from plugins.stou_texture_sync.pipeline import sanitize_local_paths  # noqa: E402
 
 TIMINGS = ("wait_after_last_change_s", "list_s", "export_s", "validate_s",
            "publish_s", "sp_side_s", "stall_ms")
@@ -39,12 +39,12 @@ def find_local_path_leaks(records) -> list[str]:
     leaks = []
 
     def visit(value, location):
-        if isinstance(value, str) and LOCAL_PATH_PATTERN.search(value):
+        if isinstance(value, str) and sanitize_local_paths(value) != value:
             leaks.append(location)
         elif isinstance(value, dict):
             for index, (key, child) in enumerate(value.items()):
                 key_location = f"{location}.<key {index}>"
-                if LOCAL_PATH_PATTERN.search(key):
+                if sanitize_local_paths(key) != key:
                     leaks.append(key_location)
                 else:
                     key_location = f"{location}.{key}"
@@ -72,7 +72,7 @@ def _stats(values) -> dict:
 
 
 def _label(value, default="default") -> str:
-    return LOCAL_PATH_PATTERN.sub("<local path>", str(value or default))
+    return sanitize_local_paths(str(value or default))
 
 
 def _sample(record: dict) -> str:
@@ -93,47 +93,68 @@ def _asset_name(value, *, source_image=False) -> str:
 
 def _registry_hash(event) -> tuple[str, ...]:
     value = event.get("registry_md5")
-    return tuple(str(item) for item in value) if isinstance(value, list) else (str(value or ""),)
+    values = value if isinstance(value, list) else [value]
+    return tuple(item.strip().casefold() for item in values if isinstance(item, str) and item.strip())
+
+
+def _publication_time(batch, file):
+    wall = file.get("published_at")
+    return wall if _number(wall) else batch.get("published_wall")
 
 
 def _correlate(batches, events) -> dict[int, float]:
-    """Match first reimport receipts for each published asset before its next publication."""
-    by_asset = defaultdict(list)
-    for event in events:
-        wall = event.get("wall")
-        asset = _asset_name(event.get("asset"))
-        if event.get("kind") == "reimport" and _number(wall) and asset:
-            by_asset[asset].append(event)
-
+    """Match reimports in the publication window of each file and sample."""
     publications = defaultdict(list)
-    expected = {}
+    samples_by_asset = defaultdict(set)
+    expected = defaultdict(set)
     for index, batch in enumerate(batches):
-        published = batch.get("published_wall")
-        if not _number(published):
+        sample = str(batch.get("sample") or "default")
+        for file in _files(batch):
+            if file.get("status") != "published":
+                continue
+            asset = _asset_name(file.get("name"), source_image=True)
+            expected[index].add(asset)
+            if asset:
+                samples_by_asset[asset].add(sample)
+                start = _publication_time(batch, file)
+                if _number(start):
+                    publications[sample, asset].append((start, index, file.get("sha")))
+
+    by_binding = defaultdict(list)
+    for event in events:
+        if event.get("kind") != "reimport" or not _number(event.get("wall")):
             continue
-        assets = {_asset_name(file.get("name"), source_image=True) for file in _files(batch)
-                  if file.get("status") == "published" and file.get("name")}
-        if assets:
-            expected[index] = assets
-        for asset in assets:
-            publications[asset].append((published, index, _sample(batch)))
+        asset = _asset_name(event.get("asset"))
+        sample = event.get("sample")
+        if sample:
+            by_binding[str(sample), asset].append(event)
+        elif len(samples_by_asset[asset]) == 1:
+            sample, = samples_by_asset[asset]
+            by_binding[sample, asset].append(event)
 
     matched = defaultdict(dict)
-    for asset, starts in publications.items():
-        starts.sort()
-        events = sorted(by_asset.get(asset, ()), key=lambda event: event["wall"])
+    for (sample, asset), starts in publications.items():
+        starts.sort(key=lambda item: item[:2])
+        receipts = sorted(by_binding[sample, asset], key=lambda event: event["wall"])
         cursor = 0
-        for index, (start, batch_index, sample) in enumerate(starts):
+        previous = None
+        for index, (start, batch_index, sha) in enumerate(starts):
             end = starts[index + 1][0] if index + 1 < len(starts) else math.inf
-            distinct = {}
-            while cursor < len(events) and events[cursor]["wall"] < end:
-                event = events[cursor]
+            while cursor < len(receipts) and receipts[cursor]["wall"] < end:
+                event = receipts[cursor]
                 cursor += 1
-                if event["wall"] >= start and (not event.get("sample") or _sample(event) == sample):
-                    identity = (event["asset"], _registry_hash(event))
-                    distinct.setdefault(identity, event["wall"])
-            if distinct:
-                matched[batch_index][asset] = min(distinct.values())
+                if event["wall"] < start:
+                    continue
+                registry = _registry_hash(event)
+                if previous is not None:
+                    previous_sha, previous_registry = previous
+                    # A repeated or unknown receipt cannot establish that different bytes arrived.
+                    if not (sha and sha == previous_sha) and (
+                            not registry or not previous_registry or registry == previous_registry):
+                        continue
+                matched[batch_index][asset] = event["wall"]
+                previous = sha, registry
+                break
 
     return {index: max(matched[index].values()) for index, assets in expected.items()
             if matched[index].keys() == assets}
@@ -171,7 +192,9 @@ def summarize(sync_records, ue_records=None, idle_records=None, target_s: float 
             summary["idle_stall_ms"] = _stats(idle_by_sample[sample])
         if ue_records is not None:
             matches = [index for index in indices if index in completion]
-            ue_times = [completion[index] - batches[index]["published_wall"] for index in matches]
+            ue_times = [completion[index] - max(
+                _publication_time(batches[index], file) for file in _files(batches[index])
+                if file.get("status") == "published") for index in matches]
             e2e = [completion[index] - batches[index]["last_change_wall"] for index in matches
                    if _number(batches[index].get("last_change_wall"))]
             eligible = sum(any(file.get("status") == "published" for file in _files(record))
