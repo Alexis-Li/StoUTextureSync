@@ -8,3 +8,6 @@
 - Add M0 validation prototypes and host evidence (not part of the plug-in).
 - Add the version command and the Painter archive build (`tools/version.py`,
   `tools/package_sp.py`).
+- Add Real-time sync, Immediate sync and Full sync in Painter for configured
+  Texture Sets and UV Tiles. Supply a local JSON configuration to publish changed
+  source images to the directory monitored by UE Auto Reimport. (#11)
