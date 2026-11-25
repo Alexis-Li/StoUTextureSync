@@ -151,6 +151,23 @@ class NamingTests(unittest.TestCase):
             naming.plan_names({"Shirt": ["U_Shirt_Base_linear1001.png"]}, templates,
                               {"Shirt": shirt})
 
+    def test_precheck_covers_templates_that_omit_an_optional_tile_group(self):
+        settings = config.parse_config({
+            "preset": "Demo", "target_dir": "t", "stage_dir": "s", "texture_sets": {"Body": {}}})
+        templates = ["T_$textureSet_Base(_$udim)", "T_Body_Base_1001(_$udim)"]
+        spec = naming.TextureSetNaming("Body")
+        with self.assertRaises(naming.NamingError):
+            naming.final_name("T_Body_Base_1001.png", templates, spec)
+        with self.assertRaisesRegex(naming.NamingError, "can match the same exported file"):
+            validate_binding_uniqueness(settings, templates, {"Body": [(0, 0)]})
+        with self.assertRaises(naming.NamingError):
+            validate_binding_uniqueness(settings, templates[::-1], {"Body": [(0, 0)]})
+        accepted = {(p.prefix, p.suffix) for p in naming.source_name_patterns(
+            templates[1], "Body", 1001, include_optional_udim_omit=True)}
+        self.assertEqual(accepted, {("t_body_base_1001_1001", None), ("t_body_base_1001", None)})
+        # Another Tile cannot be confused with the literal 1001, and distinct map types never clash.
+        validate_binding_uniqueness(settings, templates, {"Body": [(1, 0)]})
+
     def test_source_name_patterns_follow_export_names(self):
         def stems(template, name, udim):
             return {(p.prefix, p.suffix) for p in naming.source_name_patterns(template, name, udim)}
@@ -722,8 +739,14 @@ class PipelineTests(WorkspaceTest):
             "open '/Users/a/b.png'": "open '<local path>'",
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
             "/Users/Private Name/image.png,/Game/角色/T_Body": "<local path>,/Game/角色/T_Body",
+            "/Game/Private O'Brien/image.png": "<local path>",
+            "/Users/Artists' Files/image.png": "<local path>",
+            "open '/Users/a/b.png'. Next": "open '<local path>'. Next",
+            "/private.png,/Game/Body/T,https://host/a.png":
+                "<local path>,/Game/Body/T,https://host/a.png",
         }
         kept = (
+            "实时/立即/完整", "a / b",
             "/Game/角色/T_Body", "/Game/角色/T_Body /Game/Other/T_Other",
             "/Game/角色/T_Body https://example.com/a", "/Game/角色/T_Body in https://example.com/a",
         )

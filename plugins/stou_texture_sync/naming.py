@@ -204,14 +204,15 @@ def _has_token(nodes: list, name: str) -> bool:
                                          and _has_token(node[1], name)) for node in nodes)
 
 
-def _variants(nodes: list, with_udim: bool) -> list[list]:
+def _variants(nodes: list, with_udim: bool, omit_udim_groups: bool = False) -> list[list]:
     """Every flat token sequence an optional-group choice can produce."""
     variants: list[list] = [[]]
     for node in nodes:
         if isinstance(node, tuple) and node[0] == "group":
-            included = _variants(node[1], with_udim)
+            included = _variants(node[1], with_udim, omit_udim_groups)
             if _has_token(node[1], "udim"):
-                choices = included if with_udim else [[]]
+                # ``omit_udim_groups``: template_regex also accepts the group left out.
+                choices = (included + [[]] if omit_udim_groups else included) if with_udim else [[]]
             else:
                 choices = included + [[]]
         else:
@@ -241,15 +242,19 @@ def _validate_token_boundaries(template: str, nodes: list) -> None:
             last_index, last_token = index, node
 
 
-def source_name_patterns(template: str, texture_set: str,
-                         udim: int | None) -> list[FinalNamePattern]:
-    """Exact exported-stem patterns ``template`` can match for one Texture Set and Tile."""
+def source_name_patterns(template: str, texture_set: str, udim: int | None, *,
+                         include_optional_udim_omit: bool = False) -> list[FinalNamePattern]:
+    """Exported-stem patterns ``template`` emits for one Texture Set and Tile.
+
+    With ``include_optional_udim_omit`` the result is every stem the template accepts at run
+    time, which also covers file names that leave an optional ``$udim`` group out.
+    """
     template_regex(template, texture_set)
     nodes = _parse_template(template)
     if udim is None and any(node == ("tok", "udim") for node in nodes):
         raise NamingError(f"{texture_set}: the preset requires a Tile suffix")
     patterns: list[FinalNamePattern] = []
-    for variant in _variants(nodes, udim is not None):
+    for variant in _variants(nodes, udim is not None, include_optional_udim_omit):
         before, after, hole = [], [], False
         for node in variant:
             if node == ("tok", "colorSpace"):

@@ -228,6 +228,29 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(sanitize_local_paths("error /Users/Private Name/image.png /Game/角色/T_Body"),
                          "error <local path> /Game/角色/T_Body")
 
+    def test_scanner_handles_apostrophes_spaces_and_adjacent_tokens(self):
+        redacted = {
+            "/Game/Private O'Brien/image.png": "<local path>",
+            "/Game/Private Name/image.png": "<local path>",
+            "/Users/Artists' Files/image.png": "<local path>",
+            "/Users/O'Brien/image.png": "<local path>",
+            "open '/Users/a/b.png'. Next": "open '<local path>'. Next",
+            "open '/Users/O'Brien/image.png', retry": "open '<local path>', retry",
+            "/private.png,/Game/Body/T,https://host/a.png":
+                "<local path>,/Game/Body/T,https://host/a.png",
+            "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+        }
+        kept = ["/Game/角色/T_Body", "/Game/角色/T_Body /Game/Other/T_Other",
+                "/Game/角色/T_Body https://host/a.png", "实时/立即/完整", "a / b"]
+        for value, expected in redacted.items():
+            with self.subTest(value=value):
+                self.assertEqual(sanitize_local_paths(value), expected)
+                self.assertEqual(len(find_local_path_leaks([{"value": value}])), 1)
+        for value in kept:
+            with self.subTest(value=value):
+                self.assertEqual(sanitize_local_paths(value), value)
+                self.assertEqual(find_local_path_leaks([{"value": value}]), [])
+
     def test_malformed_jsonl_and_output_over_input_are_errors(self):
         path = self.root / "bad.jsonl"
         path.write_text('{}\n{broken}\n', encoding="utf-8")
