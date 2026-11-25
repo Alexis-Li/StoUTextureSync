@@ -17,7 +17,7 @@ from plugins import stou_texture_sync as plugin
 from plugins.stou_texture_sync import config, naming, publish
 from plugins.stou_texture_sync.pipeline import (
     PublishWorker, SyncEngine, SyncLogWriter, build_export_configs, format_status,
-    validate_export_and_plan,
+    validate_binding_uniqueness, validate_export_and_plan,
 )
 from plugins.stou_texture_sync.scheduler import Batch, Scheduler
 from plugins.stou_texture_sync.target_lock import LOCK_NAME, LockBusy, TargetLock
@@ -106,13 +106,42 @@ assert not any(name.split(".")[0] in {"substance_painter", "PySide6"} for name i
 
 
 class NamingTests(unittest.TestCase):
-    def test_preset_examples_cover_optional_color_space_with_or_without_a_tile(self):
-        self.assertEqual(naming.preset_example_names(TEMPLATE, "Shirt", 1001),
-                         ["T_Shirt_Albedo_1001.png", "T_Shirt_Albedo_sRGB_1001.png"])
-        self.assertEqual(naming.preset_example_names(TEMPLATE, "Shirt", None),
-                         ["T_Shirt_Albedo.png", "T_Shirt_Albedo_sRGB.png"])
-        self.assertEqual(naming.preset_example_names("T_$textureSet_Albedo_$colorSpace", "Shirt", None),
-                         ["T_Shirt_Albedo_sRGB.png"])
+    def test_final_name_patterns_cover_optional_color_space_with_or_without_a_tile(self):
+        def stems(template, spec, udim):
+            return {(p.prefix, p.suffix) for p in naming.final_name_patterns(template, spec, udim)}
+
+        shirt = naming.TextureSetNaming("Shirt")
+        self.assertEqual(stems(TEMPLATE, shirt, 1001),
+                         {("t_shirt_albedo", None), ("t_shirt_albedo_", "")})
+        self.assertEqual(stems(TEMPLATE, shirt, None),
+                         {("t_shirt_albedo", None), ("t_shirt_albedo_", "")})
+        self.assertEqual(stems("T_$textureSet_Albedo(_$colorSpace)", shirt, None),
+                         {("t_shirt_albedo", None), ("t_shirt_albedo_", "")})
+        shirt.strip_tile_suffix = False
+        self.assertEqual(stems(TEMPLATE, shirt, 1001),
+                         {("t_shirt_albedo_1001", None), ("t_shirt_albedo_", "_1001")})
+        for bad_udim in (None, 1002):
+            body = naming.TextureSetNaming("Body", mode="body_part", tile_parts={1001: "Arm"})
+            with self.subTest(udim=bad_udim), self.assertRaises(naming.NamingError):
+                naming.final_name_patterns(TEMPLATE, body, bad_udim)
+        with self.assertRaises(naming.NamingError):
+            naming.final_name_patterns("T_$textureSet_Albedo_$udim", shirt, None)
+
+    def test_pattern_overlap_is_exact(self):
+        lit, hole = (lambda p: naming.FinalNamePattern(p)), naming.FinalNamePattern
+        cases = [
+            (lit("a_b"), lit("a_b"), True), (lit("a_b"), lit("a_c"), False),
+            (lit("a_linear_1"), hole("a_", "_1"), True), (lit("a_1_1"), hole("a_", "_1"), False),
+            (lit("a_x_y_1"), hole("a_", "_1"), False), (lit("a_"), hole("a_", ""), False),
+            (hole("a_", ""), hole("a_", "_1"), False), (hole("a_", ""), hole("a_b", ""), True),
+            (hole("a_", ""), hole("a_b_", ""), False), (hole("a-", "_1"), hole("a-b", "_1"), True),
+            (hole("x", "_c"), hole("xa_", ""), True), (hole("a_", "_1"), hole("a_", "_2"), False),
+            (hole("a", "1-"), hole("a", "-"), True), (hole("a", "-1"), hole("a", "-"), False),
+        ]
+        for first, second, expected in cases:
+            with self.subTest(first=first, second=second):
+                self.assertEqual(naming.patterns_overlap(first, second), expected)
+                self.assertEqual(naming.patterns_overlap(second, first), expected)
 
     def test_keep_and_body_part_rules(self):
         keep = naming.TextureSetNaming("Coat_blue")
@@ -511,6 +540,48 @@ class PipelineTests(WorkspaceTest):
         self.assertIn("1002", outcome.error)
         self.assertFalse(list(self.target.iterdir()))
 
+    def test_single_tile_export_rejects_collision_through_any_color_space_value(self):
+        templates = ["T_$textureSet_Base(_$colorSpace)(_$udim)", "U_$textureSet_Base_linear_1001(_$udim)"]
+        for name in ("T_Shirt_Base_linear_1001.png", "T_Shirt_Base_1001.png"):
+            with self.subTest(file=name):
+                engine, _ = self.engine(enabled=True, texture_sets={
+                    "Shirt": {"mode": "keep", "strip_tile_suffix": False},
+                    "Body": {"mode": "body_part", "tile_parts": {"1002": "Shirt"}},
+                })
+                engine.record_texture_change("Shirt", (0, 0), 1, 10)
+                batch = engine.begin_next_batch(2)
+                path = self.stage / name
+                path.write_bytes(b"shirt tile")
+                outputs = {"Shirt": [str(path)]}
+                with patch.object(engine.worker, "submit", wraps=engine.worker.submit) as publish_outputs:
+                    outcome = engine.submit_export_result(
+                        batch, preset_templates=templates, stage_dir=self.stage,
+                        export_status="Success", export_message="", planned_textures=outputs,
+                        actual_textures=outputs, list_s=0, export_s=0, stall_ms=0,
+                        start_wall=12, available_tiles={"Shirt": [(0, 0)], "Body": [(1, 0)]})
+                    self.assertEqual(outcome.outcome, "naming_error")
+                    publish_outputs.assert_not_called()
+                self.assertIn("Body", outcome.error)
+                self.assertIn("1002", outcome.error)
+                self.assertFalse(list(self.target.iterdir()))
+
+    def test_regular_presets_and_body_part_mappings_have_no_name_collisions(self):
+        templates = [f"T_$textureSet_{kind}(_$colorSpace)(_$udim)"
+                     for kind in ("Albedo", "ARM", "Normal", "Emissive")]
+        settings = config.parse_config(self.settings(texture_sets={
+            "Body": {"mode": "body_part", "character_prefix": "C00",
+                     "tile_parts": {"1001": "Torso", "1002": "Arm", "1011": "Leg"}},
+            "Shirt": {"strip_tile_suffix": False},
+            "Coat": {},
+            "Hair": {"mode": "body_part", "tile_parts": {"1001": "Hair"}},
+        }))
+        available = {"Body": [(0, 0), (1, 0), (0, 1)], "Shirt": [(0, 0), (1, 0)],
+                     "Coat": [(0, 0)], "Hair": [(0, 0)]}
+        validate_binding_uniqueness(settings, templates, available)
+        validate_binding_uniqueness(settings, templates)
+        settings.texture_sets["Coat"].strip_tile_suffix = False
+        validate_binding_uniqueness(settings, templates, available)
+
     def test_configured_tiles_detect_collisions_across_texture_sets(self):
         settings = config.parse_config(self.settings(texture_sets={
             "Body": {"mode": "body_part", "tile_parts": {"1001": "Torso"}},
@@ -557,15 +628,22 @@ class PipelineTests(WorkspaceTest):
 
         paths = {
             "path:/data/private/a.png": "path:<local path>",
+            "/private.png": "<local path>",
+            "/Users/Private Name/image.png": "<local path>",
+            "file:///Projects/My Scene/test.png": "<local path>",
             "/@private/a.png": "<local path>",
             "//server/share/image.png": "<local path>",
             r"C:\Users\a\b.png": "<local path>",
             r"\\srv\share\a.png": "<local path>",
             "file:///C:/a.png": "<local path>",
             "/Game/private/a.uasset": "<local path>",
+            "/Game/private/a.png": "<local path>",
+            "error /Users/Private Name/image.png /Game/角色/T_Body":
+                "error <local path> /Game/角色/T_Body",
         }
-        public = ("/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo",
-                  "https://example.com/a/b", "resource://shelf/preset?version=1")
+        public = ("/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo", "/Game/角色/T_Body",
+                  "https://example.com/a/b", "resource://shelf/preset?version=1",
+                  "实时/立即/完整", "a / b", "1/2")
         path = self.root / "path-boundaries.jsonl"
         writer = SyncLogWriter(path)
         for value in (*paths, *public):

@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from plugins.stou_texture_sync.pipeline import sanitize_local_paths
 from tools.summarize_sync_logs import find_local_path_leaks, summarize
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "summarize_sync_logs.py"
@@ -156,6 +157,20 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(info["target"]["unmatched"], 0)
         self.assertEqual(info["ue_reimport_s"]["max"], 3)
 
+    def test_late_hashed_receipt_cannot_confirm_after_a_receipt_without_a_hash(self):
+        batches = [batch(wall, wall - 1, [("T_Body.png", "published")], sample="body")
+                   for wall in (10, 20)]
+        for record, sha in zip(batches, ("S1", "S2")):
+            record["files"][0]["sha"] = sha
+        events = [{"kind": "reimport", "wall": 11, "asset": "T_Body"},
+                  {"kind": "reimport", "wall": 21, "asset": "T_Body", "registry_md5": "X"}]
+        info = summarize(batches, events)["samples"]["body"]
+        self.assertEqual(info["target"], {"pass": 1, "fail": 0, "measured": 1, "unmatched": 1})
+        self.assertEqual(info["ue_reimport_s"]["max"], 1)
+        batches[1]["files"][0]["sha"] = "S1"
+        info = summarize(batches, events)["samples"]["body"]
+        self.assertEqual(info["target"]["unmatched"], 0)
+
     def test_unlabeled_receipt_routes_only_to_a_sample_already_published(self):
         batches = [batch(10, 9, [("T_Body.png", "published")], sample="A"),
                    batch(20, 19, [("T_Body.png", "published")], sample="B")]
@@ -184,6 +199,24 @@ class SummaryTests(unittest.TestCase):
         self.assertFalse(json.loads(result.stdout)["sanitized"])
         self.assertNotIn("Private Name", result.stdout)
         self.assertNotIn("secret", result.stdout)
+
+    def test_strict_scan_finds_whole_local_paths_and_keeps_public_text(self):
+        leaks = ["/private.png", "/Users/Private Name/image.png", "file:///Projects/My Scene/test.png",
+                 "path:/data/private/a.png", "/@private/a.png", "//server/share/image.png",
+                 r"C:\Users\a\b.png", r"\\srv\share\a.png", "/Game/private/a.png"]
+        public = ["/Game/角色/T_Body", "/Game/Characters/Coat/T_Coat_Albedo.T_Coat_Albedo",
+                  "https://example.com/a/b", "resource://shelf/preset?version=1",
+                  "实时/立即/完整", "a / b", "1/2"]
+        for value in leaks:
+            with self.subTest(leak=value):
+                self.assertEqual(len(find_local_path_leaks([{"value": value}])), 1)
+                self.assertNotIn("png", sanitize_local_paths(value))
+        for value in public:
+            with self.subTest(public=value):
+                self.assertEqual(find_local_path_leaks([{"value": value}]), [])
+                self.assertEqual(sanitize_local_paths(value), value)
+        self.assertEqual(sanitize_local_paths("error /Users/Private Name/image.png /Game/角色/T_Body"),
+                         "error <local path> /Game/角色/T_Body")
 
     def test_malformed_jsonl_and_output_over_input_are_errors(self):
         path = self.root / "bad.jsonl"

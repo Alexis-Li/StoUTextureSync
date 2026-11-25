@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import SyncConfig
-from .naming import NamingError, final_name, plan_names, preset_example_names, udim_to_uv, uv_to_udim
+from .naming import (
+    NamingError, final_name_patterns, find_pattern_overlaps, plan_names, udim_to_uv, uv_to_udim,
+)
 from .publish import STAGE_MARKER, BatchResult, publish_batch
 from .scheduler import WHOLE, Batch, Scheduler
 from .target_lock import TargetLock
@@ -30,18 +32,19 @@ STATUS_TEXT = {
 # UE package names are virtual paths unless the suffix identifies a local file.
 _PUBLIC_PATH = (
     r"(?:https?|resource)://[^\s\"'<>|]+|"
-    r"(?<![A-Za-z0-9_./\\-])/(?:Game|Engine|Script)"
+    r"(?<![\w./\\-])/(?:Game|Engine|Script)"
     r"(?!/[^\s\"'<>|]*\.(?:png|tga|exr|jpg|jpeg|bmp|tif|tiff|psd|spp|sbsar|uproject|"
     r"uasset|umap|jsonl?|log|txt|py|bat|ps1|exe|dll|zip)\b)"
-    r"(?:/[A-Za-z0-9_.-]+)+(?![A-Za-z0-9_./\\-])"
+    r"(?:/[\w.-]+)+(?![\w./\\-])"
 )
+# A local path may contain spaces; it ends at a quote, a line break or a following public token.
 _LOCAL_PATH_TAIL = rf"(?:(?![ \t]+(?:{_PUBLIC_PATH}))[^\"'<>|\r\n])*"
 LOCAL_PATH_PATTERN = re.compile(
     rf"(?P<public>{_PUBLIC_PATH})|"
-    r"file://[^\s\"'<>|]+|"
+    rf"file://{_LOCAL_PATH_TAIL}|"
     r"(?:(?<![A-Za-z0-9_])[A-Za-z]:[\\/]|\\\\[^\\/\s\"'<>|]+\\|"
     rf"//[^\\/\s\"'<>|]+/|(?<![A-Za-z0-9_])~[/\\]){_LOCAL_PATH_TAIL}|"
-    r"(?<![A-Za-z0-9_./\\])/(?:[^/\s\"'<>|]+/)+[^\s\"'<>|]*",
+    rf"(?<![\w./\\])/(?=[^\s/\"'<>|]){_LOCAL_PATH_TAIL}",
     re.IGNORECASE,
 )
 
@@ -134,7 +137,7 @@ def validate_stage_paths(stage_dir: str, textures: dict) -> None:
 
 def validate_binding_uniqueness(config, templates, available_tiles=None) -> None:
     """Check final names across enabled bindings, including unchanged Tiles."""
-    owners, errors = {}, []
+    items, errors = [], []
     for name, binding in config.texture_sets.items():
         if not binding.enabled:
             continue
@@ -145,21 +148,19 @@ def validate_binding_uniqueness(config, templates, available_tiles=None) -> None
             udims = binding.tile_parts.keys() | binding.tile_size_log2.keys()
         for udim in sorted(udims) or [None]:
             for template in templates:
-                owner = (name, udim, template)
                 try:
-                    examples = preset_example_names(template, name, udim)
+                    patterns = final_name_patterns(template, naming, udim)
                 except NamingError as exc:
-                    errors.append(str(exc))
-                    continue
-                for example in examples:
-                    try:
-                        target_name = final_name(example, templates, naming)
-                    except NamingError as exc:
+                    if str(exc) not in errors:
                         errors.append(str(exc))
-                        continue
-                    previous_owner = owners.setdefault(target_name.casefold(), owner)
-                    if previous_owner != owner:
-                        errors.append(f"{target_name}: produced by both {previous_owner} and {owner}")
+                    continue
+                items.extend(((name, udim, template), pattern) for pattern in patterns)
+    reported = set()
+    for owner_a, pattern_a, owner_b, pattern_b in find_pattern_overlaps(items):
+        if (owner_a, owner_b) not in reported:
+            reported.add((owner_a, owner_b))
+            errors.append(f"{pattern_a.describe()} and {pattern_b.describe()} can produce the "
+                          f"same final name: produced by both {owner_a} and {owner_b}")
     if errors:
         raise NamingError("; ".join(errors))
 

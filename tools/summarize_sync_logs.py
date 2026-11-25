@@ -144,6 +144,7 @@ def _correlate(batches, events) -> dict[int, float]:
         confirmed: dict[tuple[str, ...], str | None] = {}
         has_confirmed = False
         last_confirmed_sha: str | None = None
+        unhashed_shas: set[str | None] = set()  # confirmed by a receipt without registry_md5
         for index, (start, batch_index, sha) in enumerate(starts):
             end = starts[index + 1][0] if index + 1 < len(starts) else math.inf
             while cursor < len(receipts) and receipts[cursor]["wall"] < end:
@@ -153,13 +154,20 @@ def _correlate(batches, events) -> dict[int, float]:
                     continue
                 registry = _registry_hash(event)
                 if has_confirmed:
-                    if not registry and not (sha and sha == last_confirmed_sha):
-                        continue
-                    if registry in confirmed and not (sha and sha == confirmed[registry]):
+                    if not registry:
+                        if not (sha and sha == last_confirmed_sha):
+                            continue
+                    elif registry in confirmed:
+                        if not (sha and sha == confirmed[registry]):
+                            continue
+                    elif any(earlier is None or earlier != sha for earlier in unhashed_shas):
+                        # It may be the late broadcast of an earlier batch confirmed without a hash.
                         continue
                 matched[batch_index][asset] = event["wall"]
                 if registry:
                     confirmed[registry] = sha
+                else:
+                    unhashed_shas.add(sha)
                 has_confirmed = True
                 last_confirmed_sha = sha
                 break

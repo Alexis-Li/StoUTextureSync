@@ -76,39 +76,6 @@ def uv_to_udim(u: int, v: int) -> int:
     return 1001 + u + 10 * v
 
 
-def preset_example_names(template: str, texture_set: str, udim: int | None) -> list[str]:
-    """Instantiate the template with and without an optional color-space group."""
-    template_regex(template, texture_set)
-    tokens = {"textureSet": texture_set, "colorSpace": "sRGB",
-              "udim": str(udim) if udim is not None else ""}
-    if udim is None:
-        template = re.sub(r"\([^()]*\$udim[^()]*\)", "", template)
-        if "$udim" in template:
-            raise NamingError(f"{texture_set}: the preset requires a Tile suffix")
-
-    variants = [template]
-    group_starts = []
-    color_group_start = None
-    for match in re.finditer(r"\(|\)|\$colorSpace", template):
-        if match[0] == "(":
-            group_starts.append(match.start())
-        elif match[0] == ")":
-            start = group_starts.pop()
-            if start == color_group_start:
-                variants.insert(0, template[:start] + template[match.end():])
-                break
-        elif group_starts:
-            color_group_start = group_starts[-1]
-
-    examples = []
-    for variant in variants:
-        body = variant.replace("(", "").replace(")", "")
-        example = re.sub(r"\$([A-Za-z]+)", lambda match: tokens[match[1]], body) + ".png"
-        if example not in examples:
-            examples.append(example)
-    return examples
-
-
 @dataclass
 class TextureSetNaming:
     """Naming configuration of one bound Texture Set."""
@@ -186,6 +153,199 @@ def final_name(file_name: str, templates: list[str], naming: TextureSetNaming) -
     name = f"T_{prefix}{part}_{kind}{color_suffix}.{ext}"
     validate_basename(name)
     return name
+
+
+_COLOR_SPACE_RE = re.compile(r"[a-z0-9\-]*[a-z][a-z0-9\-]*")
+_COLOR_CHARS_RE = re.compile(r"[a-z0-9\-]*")
+
+
+@dataclass(frozen=True)
+class FinalNamePattern:
+    """The set of final file stems (no extension, case-folded) one template can produce.
+
+    ``suffix is None`` is the exact stem ``prefix``. Otherwise the stem is
+    ``prefix + C + suffix`` where ``C`` is any legal ``$colorSpace`` value.
+    """
+
+    prefix: str
+    suffix: str | None = None
+    label: str = field(default="", compare=False)
+
+    def describe(self) -> str:
+        return self.label or (self.prefix if self.suffix is None
+                              else f"{self.prefix}<colorSpace>{self.suffix}")
+
+
+def _parse_template(template: str) -> list:
+    """Nested list of literal characters, ('tok', name) and ('group', children)."""
+    stack: list[list] = [[]]
+    i = 0
+    while i < len(template):
+        char = template[i]
+        if char == "(":
+            stack.append([])
+        elif char == ")":
+            children = stack.pop()
+            stack[-1].append(("group", children))
+        elif char == "$":
+            name = re.match(r"\$([A-Za-z]+)", template[i:]).group(1)
+            stack[-1].append(("tok", name))
+            i += len(name) + 1
+            continue
+        else:
+            stack[-1].append(char)
+        i += 1
+    return stack[0]
+
+
+def _has_token(nodes: list, name: str) -> bool:
+    return any(node == ("tok", name) or (isinstance(node, tuple) and node[0] == "group"
+                                         and _has_token(node[1], name)) for node in nodes)
+
+
+def _variants(nodes: list, with_udim: bool) -> list[list]:
+    """Every flat token sequence an optional-group choice can produce."""
+    variants: list[list] = [[]]
+    for node in nodes:
+        if isinstance(node, tuple) and node[0] == "group":
+            included = _variants(node[1], with_udim)
+            if _has_token(node[1], "udim"):
+                choices = included if with_udim else [[]]
+            else:
+                choices = included + [[]]
+        else:
+            choices = [[node]]
+        variants = [variant + choice for variant in variants for choice in choices]
+    return variants
+
+
+def final_name_patterns(template: str, naming: TextureSetNaming,
+                        udim: int | None) -> list[FinalNamePattern]:
+    """All final-stem patterns ``template`` can produce for one Texture Set and Tile."""
+    template_regex(template, naming.texture_set)
+    naming.validate()
+    nodes = _parse_template(template)
+    if udim is None and any(node == ("tok", "udim") for node in nodes):
+        raise NamingError(f"{naming.texture_set}: the preset requires a Tile suffix")
+    part = None
+    if naming.mode == "body_part":
+        if udim is None:
+            raise NamingError(f"{naming.texture_set}: body-part mode needs a Tile suffix")
+        part = naming.tile_parts.get(udim)
+        if part is None:
+            raise NamingError(f"{naming.texture_set}: Tile {udim} has no body-part mapping")
+    kind = map_type(template)
+    patterns: list[FinalNamePattern] = []
+    for variant in _variants(nodes, udim is not None):
+        before, after, hole, has_udim = [], [], False, False
+        for node in variant:
+            if node == ("tok", "colorSpace"):
+                hole = True
+                continue
+            if node == ("tok", "textureSet"):
+                text = naming.texture_set
+            elif node == ("tok", "udim"):
+                text, has_udim = str(udim), True
+            else:
+                text = node
+            (after if hole else before).append(text)
+        if naming.mode == "keep" and has_udim and not naming.strip_tile_suffix:
+            prefix, suffix = "".join(before), "".join(after)
+        else:
+            if naming.mode == "body_part":
+                if not has_udim:
+                    raise NamingError(f"{naming.texture_set}: body-part mode needs a Tile suffix")
+                head = f"T_{naming.character_prefix + '_' if naming.character_prefix else ''}{part}_{kind}"
+            else:
+                head = f"T_{naming.texture_set}_{kind}"
+            prefix, suffix = (head + "_", "") if hole else (head, "")
+        validate_basename(f"{prefix}{'c' + suffix if hole else ''}.png")
+        pattern = FinalNamePattern(
+            prefix.casefold(), suffix.casefold() if hole else None,
+            f"{prefix}{'<colorSpace>' + suffix if hole else ''}.png")
+        if pattern not in patterns:
+            patterns.append(pattern)
+    return patterns
+
+
+def _legal_chars(text: str) -> bool:
+    return _COLOR_CHARS_RE.fullmatch(text) is not None
+
+
+def _legal_color(text: str) -> bool:
+    return _COLOR_SPACE_RE.fullmatch(text) is not None
+
+
+def _holes_overlap(p1: str, s1: str, p2: str, s2: str) -> bool:
+    """Whether p1+C1+s1 == p2+C2+s2 for some legal colour spaces C1 and C2."""
+    if len(p1) > len(p2):
+        p1, s1, p2, s2 = p2, s2, p1, s1
+    if not p2.startswith(p1):
+        return False
+    dp = p2[len(p1):]                      # C1 + s1 == dp + C2 + s2
+    if len(s2) > len(s1):
+        if not s2.endswith(s1):
+            return False
+        return _legal_chars(dp) and _legal_chars(s2[:len(s2) - len(s1)])  # C1 == dp+C2+ds
+    if not s1.endswith(s2):
+        return False
+    ds = s1[:len(s1) - len(s2)]            # C1 + ds == dp + C2
+    if _legal_chars(dp) and _legal_chars(ds):
+        return True
+    for k in range(1, len(dp)):            # dp == C1 + t and ds == t + C2
+        if (ds.startswith(dp[len(dp) - k:]) and _legal_color(dp[:len(dp) - k])
+                and _legal_color(ds[k:])):
+            return True
+    return False
+
+
+def patterns_overlap(a: FinalNamePattern, b: FinalNamePattern) -> bool:
+    """Whether two patterns can produce the same final stem."""
+    if a.suffix is None and b.suffix is None:
+        return a.prefix == b.prefix
+    if a.suffix is None or b.suffix is None:
+        literal, hole = (a, b) if a.suffix is None else (b, a)
+        text = literal.prefix
+        if (len(text) < len(hole.prefix) + len(hole.suffix) or not text.startswith(hole.prefix)
+                or not text.endswith(hole.suffix)):
+            return False
+        return _legal_color(text[len(hole.prefix):len(text) - len(hole.suffix)])
+    return _holes_overlap(a.prefix, a.suffix, b.prefix, b.suffix)
+
+
+def find_pattern_overlaps(items) -> list[tuple]:
+    """Return ``(owner_a, pattern_a, owner_b, pattern_b)`` for every colliding pair.
+
+    ``items`` is an iterable of ``(owner, pattern)``; pairs of one owner never collide.
+    """
+    literals: dict[str, list] = {}
+    holes: dict[str, list] = {}
+    for owner, pattern in items:
+        bucket = literals if pattern.suffix is None else holes
+        bucket.setdefault(pattern.prefix, []).append((owner, pattern))
+    found = []
+
+    def add(first, second):
+        if first[0] != second[0] and patterns_overlap(first[1], second[1]):
+            found.append((*first, *second))
+
+    for prefix, group in literals.items():
+        for index, first in enumerate(group):
+            for second in group[index + 1:]:
+                add(first, second)
+        for end in range(len(prefix) + 1):
+            for hole in holes.get(prefix[:end], ()):
+                for literal in group:
+                    add(literal, hole)
+    for prefix, group in holes.items():
+        for index, first in enumerate(group):
+            for second in group[index + 1:]:
+                add(first, second)
+        for end in range(len(prefix)):
+            for shorter in holes.get(prefix[:end], ()):
+                for hole in group:
+                    add(shorter, hole)
+    return found
 
 
 def plan_names(files: dict[str, list[str]], templates: list[str],
