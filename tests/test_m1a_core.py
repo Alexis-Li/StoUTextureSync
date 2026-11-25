@@ -991,7 +991,9 @@ class PainterControllerTests(WorkspaceTest):
         )
         modules["PySide6"] = SimpleNamespace(QtCore=self.qt)
         modules[f"{package}.panel"] = SimpleNamespace(SyncPanel=Mock())
-        self.enterContext(patch.dict(sys.modules, modules))
+        modules_patch = patch.dict(sys.modules, modules)
+        modules_patch.start()
+        self.addCleanup(modules_patch.stop)
         spec = importlib.util.spec_from_file_location(
             f"{package}.host_painter", Path(config.__file__).with_name("host_painter.py"))
         module = importlib.util.module_from_spec(spec)
@@ -1004,7 +1006,9 @@ class PainterControllerTests(WorkspaceTest):
         painter.export.list_project_textures.side_effect = self._list
         painter.export.export_project_textures.side_effect = self._export
         settings = config.parse_config(self.settings(enabled=True, throttle_ms=None))
-        self.enterContext(patch.object(plugin, "_STATE", SimpleNamespace(config_override=settings)))
+        state_patch = patch.object(plugin, "_STATE", SimpleNamespace(config_override=settings))
+        state_patch.start()
+        self.addCleanup(state_patch.stop)
         self.addCleanup(plugin.close_plugin)
         plugin.start_plugin()
         self.controller = plugin.get_controller()
