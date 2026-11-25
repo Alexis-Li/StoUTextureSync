@@ -285,10 +285,13 @@ def pattern_matches_template(emitted: FinalNamePattern, template: str, texture_s
     patterns of each Tile number it can contain.
     """
     if emitted.suffix is None:
-        rx = re.compile(template_regex(template, texture_set).pattern, re.IGNORECASE)
+        raw_rx = template_regex(template, texture_set)
+        if emitted.label and raw_rx.fullmatch(emitted.label):
+            return True
+        rx = re.compile(raw_rx.pattern, re.IGNORECASE)
         return rx.fullmatch(f"{emitted.prefix}.png") is not None
     text = f"{emitted.prefix} {emitted.suffix}"
-    candidates: set[int | None] = {None, 1001, *(int(found) for found in re.findall(r"1\d{3}", text))}
+    candidates: set[int | None] = {None, 1001, *(int(found) for found in re.findall(r"(?=(1\d{3}))", text))}
     if current_udim is not None:
         candidates.add(current_udim)
     for udim in candidates:

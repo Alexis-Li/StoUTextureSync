@@ -232,6 +232,7 @@ class SummaryTests(unittest.TestCase):
 
     def test_scanner_handles_apostrophes_spaces_and_adjacent_urls(self):
         redacted = {
+            "/game/private/asset": "<local path>",
             "/Game/Private O'Brien/image.png": "<local path>",
             "/Game/O'Brien/image.png": "<local path>",
             "/Game/Private Name/image.png": "<local path>",
@@ -243,9 +244,12 @@ class SummaryTests(unittest.TestCase):
             "open '/Users/a/b.png' and 'done'": "open '<local path>' and 'done'",
             "open '/Users/O'Brien/image.png', retry": "open '<local path>', retry",
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            r"https://example.com/a,C:\Private\image.png": "https://example.com/a,<local path>",
             "/private.png,/Game/Body/T,https://host/a.png": "<local path>,https://host/a.png",
         }
-        kept = ["/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "实时/立即/完整", "a / b"]
+        kept = ["/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/BasicShapes/Cube",
+                "/Script/Engine/Texture2D", "https://example.com/a/b", "resource://shelf/preset?version=1",
+                "实时/立即/完整", "a / b"]
         for value, expected in redacted.items():
             with self.subTest(value=value):
                 self.assertEqual(sanitize_local_paths(value), expected)

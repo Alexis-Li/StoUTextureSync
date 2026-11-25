@@ -185,6 +185,24 @@ class NamingTests(unittest.TestCase):
                               spec)
         validate_binding_uniqueness(settings, ["T_$textureSet_Base(_$udim)", "T_Body_Other_1002"], available)
 
+    def test_precheck_matches_runtime_with_original_texture_set_spelling(self):
+        settings = config.parse_config({
+            "preset": "Demo", "target_dir": "t", "stage_dir": "s", "texture_sets": {"Straße": {}}})
+        templates = ["T_$textureSet_Base(_$udim)", "T_$textureSet_Base_1002"]
+        with self.assertRaisesRegex(naming.NamingError, "matches several preset templates"):
+            naming.final_name("T_Straße_Base_1002.png", templates, naming.TextureSetNaming("Straße"))
+        with self.assertRaisesRegex(naming.NamingError, "can match the same exported file"):
+            validate_binding_uniqueness(settings, templates, {"Straße": [(0, 0)]})
+
+    def test_precheck_matches_runtime_for_overlapping_udim_digits(self):
+        settings = config.parse_config({
+            "preset": "Demo", "target_dir": "t", "stage_dir": "s", "texture_sets": {"Body": {}}})
+        templates = ["$colorSpace_T_$textureSet_Base11002", "$colorSpace_T_$textureSet_Base1($udim)"]
+        with self.assertRaisesRegex(naming.NamingError, "matches several preset templates"):
+            naming.final_name("sRGB_T_Body_Base11002.png", templates, naming.TextureSetNaming("Body"))
+        with self.assertRaisesRegex(naming.NamingError, "can match the same exported file"):
+            validate_binding_uniqueness(settings, templates, {"Body": [(0, 0)]})
+
     def test_source_name_patterns_follow_export_names(self):
         def stems(template, name, udim):
             return {(p.prefix, p.suffix) for p in naming.source_name_patterns(template, name, udim)}
@@ -748,6 +766,7 @@ class PipelineTests(WorkspaceTest):
         from tools.summarize_sync_logs import find_local_path_leaks
 
         redacted = {
+            "/game/private/asset": "<local path>",
             "/Game/Private Name/image.png": "<local path>",
             "/Game/My Private Name/image.png": "<local path>",
             "/Game/O'Brien/image.png": "<local path>",
@@ -763,6 +782,7 @@ class PipelineTests(WorkspaceTest):
             "open '/Users/a/b.png' and '/Users/c/d.png'":
                 "open '<local path>' and '<local path>'",
             "/private.png,https://example.com/a": "<local path>,https://example.com/a",
+            r"https://example.com/a,C:\Private\image.png": "https://example.com/a,<local path>",
             "/Users/Private Name/image.png,https://example.com/a":
                 "<local path>,https://example.com/a",
             "/Game/角色/T_Body in /private.png": "<local path>",
@@ -770,7 +790,8 @@ class PipelineTests(WorkspaceTest):
         kept = (
             "实时/立即/完整", "a / b", "1/2",
             "/Game/角色/T_Body", "/Game/StoU/T_Face.T_Face", "/Engine/Transient",
-            "/Script/Engine.Texture2D", "https://example.com/a/b",
+            "/Script/Engine.Texture2D", "/Engine/BasicShapes/Cube", "/Script/Engine/Texture2D",
+            "https://example.com/a/b", "resource://shelf/preset?version=1",
         )
         path = self.root / "edges.jsonl"
         writer = SyncLogWriter(path)
@@ -781,7 +802,8 @@ class PipelineTests(WorkspaceTest):
             with self.subTest(value=value):
                 self.assertEqual(sanitize_local_paths(value), redacted.get(value, value))
                 self.assertEqual(record["value"], redacted.get(value, value))
-                self.assertEqual(bool(find_local_path_leaks([{"value": value}])), value in redacted)
+                self.assertEqual(find_local_path_leaks([{"value": value}]),
+                                 ["record 1.value"] if value in redacted else [])
                 self.assertEqual(find_local_path_leaks([record]), [])
 
     def test_stall_includes_validation_and_worker_submission_even_on_failure(self):

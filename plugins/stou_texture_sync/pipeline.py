@@ -33,8 +33,7 @@ STATUS_TEXT = {
 # Local-path redaction. A value that is exactly a UE virtual path or a public URL is kept as is;
 # inside free text only public URLs are kept, so no guess about the words after a ``/Game/...``
 # token can leak a local path.
-_WHOLE_UE_PATH_RE = re.compile(r"/(?:Game|Engine|Script)(?:/[\w-]+)+(?:\.[\w-]+)?", re.IGNORECASE)
-_WHOLE_PUBLIC_URL_RE = re.compile(r"(?:https?|resource)://[^\s\"'<>|]+", re.IGNORECASE)
+_WHOLE_UE_PATH_RE = re.compile(r"/(?:Game|Engine|Script)(?:/[\w-]+)+(?:\.[\w-]+)?")
 _PUBLIC_URL_RE = re.compile(r"(?:https?|resource)://[^\s\"'<>|,;)\]}]+", re.IGNORECASE)
 _LOCAL_EXT_RE = re.compile(
     r"\.(?:png|tga|exr|jpg|jpeg|bmp|tif|tiff|psd|spp|sbsar|uproject|uasset|umap|jsonl?|log|txt|"
@@ -88,8 +87,7 @@ def _opens_quote(text: str, pos: int) -> bool:
 
 def sanitize_local_paths(value: str) -> str:
     """Replace local file paths with ``<local path>``; keep public URLs and whole UE virtual paths."""
-    if ((_WHOLE_UE_PATH_RE.fullmatch(value) and not _LOCAL_EXT_RE.search(value))
-            or _WHOLE_PUBLIC_URL_RE.fullmatch(value)):
+    if _WHOLE_UE_PATH_RE.fullmatch(value) and not _LOCAL_EXT_RE.search(value):
         return value
     out, pos, active_quote = [], 0, None
     while pos < len(value):
